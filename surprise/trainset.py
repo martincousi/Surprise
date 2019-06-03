@@ -221,7 +221,7 @@ class Trainset:
         except KeyError:
             raise ValueError(str(iiid) + ' is not a valid inner id.')
 
-    def all_ratings(self):
+    def all_ratings(self, sample_weight=False):
         """Generator function to iterate over all ratings.
 
         Yields:
@@ -230,8 +230,11 @@ class Trainset:
         """
 
         for u, u_ratings in iteritems(self.ur):
-            for i, r in u_ratings:
-                yield u, i, r
+            for i, r, w in u_ratings:
+                if sample_weight:
+                    yield u, i, r, w
+                else:
+                    yield u, i, r
 
     def build_testset(self):
         """Return a list of ratings that can be used as a testset in the
@@ -305,11 +308,19 @@ class Trainset:
 
     @property
     def global_mean(self):
-        """Return the mean of all ratings.
+        """Return the (weighted) mean of all ratings. When `sample_weight` is
+        provided, the weighted mean of all ratings is computed.
 
-        It's only computed once."""
+        It's only computed once.
+        """
         if self._global_mean is None:
-            self._global_mean = np.mean([r for (_, _, r) in
-                                         self.all_ratings()])
+            if self.sample_weight:
+                temp = [(r, w) for (_, _, r, w)
+                        in self.all_ratings(sample_weight=True)]
+                ratings, weights = list(zip(*temp))
+                self._global_mean = np.dot(weights, ratings) / np.sum(weights)
+            else:
+                self._global_mean = np.mean([r for (_, _, r) in
+                                             self.all_ratings()])
 
         return self._global_mean

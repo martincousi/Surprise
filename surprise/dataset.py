@@ -306,14 +306,16 @@ class Dataset:
 
             if self.raw_sample_weight:
                 try:
-                    sample_weight[(uid, iid)] = self.raw_sample_weight[
-                        (urid, irid)]
+                    w = self.raw_sample_weight[(urid, irid)]
+                    sample_weight[(uid, iid)] = w
                 except KeyError:
                     raise ValueError('Sample weights are used but are missing'
                                      'for user-item: {}'.format((urid, irid)))
+            else:
+                w = None
 
-            ur[uid].append((iid, r))
-            ir[iid].append((uid, r))
+            ur[uid].append((iid, r, w))
+            ir[iid].append((uid, r, w))
 
         n_users = len(ur)  # number of users
         n_items = len(ir)  # number of items
