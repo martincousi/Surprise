@@ -39,6 +39,9 @@ class Trainset:
         i_features(:obj:`defaultdict` of :obj:`list`): The item features. This
             is a dictionary containing lists of features. The keys are item
             inner ids.
+        sample_weight(dict): The sample weights. This is a dictionary
+            containing the sample weight of a user-item pair. The keys are
+            the user-item inner ids provided as a tuple.
         n_users: Total number of users :math:`|U|`.
         n_items: Total number of items :math:`|I|`.
         n_user_features: Total number of user features.
@@ -49,15 +52,16 @@ class Trainset:
         global_mean: The mean of all ratings :math:`\\mu`.
     """
 
-    def __init__(self, ur, ir, u_features, i_features, n_users, n_items,
-                 n_user_features, n_item_features, user_features_labels,
-                 item_features_labels, n_ratings, rating_scale, offset,
-                 raw2inner_id_users, raw2inner_id_items):
+    def __init__(self, ur, ir, u_features, i_features, sample_weight, n_users,
+                 n_items, n_user_features, n_item_features,
+                 user_features_labels, item_features_labels, n_ratings,
+                 rating_scale, offset, raw2inner_id_users, raw2inner_id_items):
 
         self.ur = ur
         self.ir = ir
         self.u_features = u_features
         self.i_features = i_features
+        self.sample_weight = sample_weight
         self.n_users = n_users
         self.n_items = n_items
         self.n_user_features = n_user_features

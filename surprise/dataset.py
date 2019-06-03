@@ -59,6 +59,7 @@ class Dataset:
         self.item_features = {}
         self.user_features_labels = []
         self.item_features_labels = []
+        self.raw_sample_weight = {}
 
     @classmethod
     def load_builtin(cls, name='ml-100k'):
@@ -207,6 +208,26 @@ class Dataset:
 
         return self
 
+    def load_sample_weight_df(self, sample_weight_df):
+        """Load sample weights from a pandas dataframe into a dataset.
+
+        Use this if you want to add user-item sample weights to a dataset.
+
+        Args:
+            sample_weight_df(`Dataframe`): The dataframe containing the sample
+                weights. It must have three columns, corresponding to the user
+                (raw) ids, item (raw) ids and sample weights, in this order.
+        """
+
+        if len(sample_weight_df.columns) != 3:
+            raise ValueError('sample_weight_df requires 3 columns.')
+
+        # Save weights using raw user-item ids
+        for (uid, iid, w) in sample_weight_df.itertuples(index=False):
+            self.raw_sample_weight[(uid, iid)] = float(w)
+
+        return self
+
     def read_ratings(self, file_name):
         """Return a list of ratings (user, item, rating, timestamp) read from
         file_name"""
@@ -253,6 +274,8 @@ class Dataset:
         u_features = defaultdict(list)
         i_features = defaultdict(list)
 
+        sample_weight = {}
+
         # user raw id, item raw id, translated rating, time stamp
         for urid, irid, r, _ in raw_trainset:
             try:
@@ -281,6 +304,14 @@ class Dataset:
                         raise ValueError('Features are defined for all items'
                                          'but item {}'.format(irid))
 
+            if self.raw_sample_weight:
+                try:
+                    sample_weight[(uid, iid)] = self.raw_sample_weight[
+                        (urid, irid)]
+                except KeyError:
+                    raise ValueError('Sample weights are used but are missing'
+                                     'for user-item: {}'.format((urid, irid)))
+
             ur[uid].append((iid, r))
             ir[iid].append((uid, r))
 
@@ -292,6 +323,7 @@ class Dataset:
                             ir,
                             u_features,
                             i_features,
+                            sample_weight,
                             n_users,
                             n_items,
                             self.user_features_nb,

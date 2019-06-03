@@ -152,15 +152,16 @@ class FM(AlgoBase):
         params = FM._add_weight_decay(self.model, self.reg)
         self.optimizer = torch.optim.Adam(params, lr=self.lr)
 
-        # Define data (TODO : sample_weights)
-        x = self.libsvm_df.loc[
-            :, self.libsvm_df.columns != 'rating'].values.astype('float64')
-        y = self.libsvm_df.loc[
-            :, 'rating'].values.astype('float64')
-        sample_weights = None
-        if sample_weights:
+        # Define data
+        x = self.libsvm_df.iloc[:, 2:].values.astype('float64')
+        y = self.libsvm_df.iloc[:, 0].values.astype('float64')
+        if self.trainset.sample_weight:
+            sample_weight = self.libsvm_df.iloc[:, 1].values.astype('float64')
+        else:
+            sample_weight = None
+        if sample_weight is not None:
             x_train, x_dev, y_train, y_dev, w_train, w_dev = train_test_split(
-                x, y, sample_weights, test_size=self.dev_ratio,
+                x, y, sample_weight, test_size=self.dev_ratio,
                 random_state=self.random_state)
             w_train = torch.Tensor(w_train)
             w_dev = torch.Tensor(w_dev)
@@ -224,15 +225,15 @@ class FM(AlgoBase):
         return [{'params': no_decay, 'weight_decay': 0.},
                 {'params': decay, 'weight_decay': reg}]
 
-    def _compute_loss(self, y_pred, y, sample_weights=None):
+    def _compute_loss(self, y_pred, y, sample_weight=None):
         """ Computes a different loss depending on whether `sample_weights` are
         defined.
         """
 
-        if sample_weights is not None:
+        if sample_weight is not None:
             criterion = nn.MSELoss(reduction='none')
             loss = criterion(y_pred, y)
-            loss = torch.dot(sample_weights, loss) / y.shape[0]
+            loss = torch.dot(sample_weight, loss) / torch.sum(sample_weight)
         else:
             criterion = nn.MSELoss()
             loss = criterion(y_pred, y)
@@ -265,6 +266,11 @@ class FM(AlgoBase):
 
         # Initialize df with rating values
         libsvm_df = pd.DataFrame(ratings_df['rating'])
+
+        # Add sample_weight column
+        libsvm_df['sample_weight'] = ratings_df.apply(
+            lambda x: self.trainset.sample_weight.get(
+                (x['userID'], x['itemID']), np.nan), axis=1)
 
         # Add rating features
         if self.rating_lst:
@@ -337,7 +343,7 @@ class FM(AlgoBase):
                         '{} is not part of item_features'.format(feature))
 
         self.libsvm_df = libsvm_df
-        self.n_features = libsvm_df.shape[1] - 1
+        self.n_features = libsvm_df.shape[1] - 2
 
     def estimate(self, u, i, u_features, i_features):
 
