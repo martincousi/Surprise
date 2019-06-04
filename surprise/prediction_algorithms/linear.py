@@ -4,6 +4,8 @@ the :mod:`linear` module includes linear features-based algorithms.
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import warnings
+
 import numpy as np
 from sklearn import linear_model
 
@@ -48,6 +50,11 @@ class Lasso(AlgoBase):
         self.random_state = random_state
         self.selection = selection
 
+        # sample_weight option is currently not supported in scikit-learn
+        # Lasso().fit()
+        warnings.warn('Lasso() currently does not use sample_weight',
+                      UserWarning)
+
     def fit(self, trainset):
 
         AlgoBase.fit(self, trainset)
@@ -72,20 +79,13 @@ class Lasso(AlgoBase):
 
         X = np.empty((n_ratings, n_uf + n_if))
         y = np.empty((n_ratings,))
-        for k, (uid, iid, rating) in enumerate(self.trainset.all_ratings()):
+        w = np.empty((n_ratings,))
+        for k, (uid, iid, rating, weight) in enumerate(
+                self.trainset.all_ratings(sample_weight=True)):
             y[k] = rating
-
-            try:
-                X[k, :n_uf] = u_features[uid]
-            except KeyError:
-                raise ValueError('No features for user ' +
-                                 str(self.trainset.to_raw_uid(uid)))
-
-            try:
-                X[k, n_uf:] = i_features[iid]
-            except KeyError:
-                raise ValueError('No features for item ' +
-                                 str(self.trainset.to_raw_iid(iid)))
+            X[k, :n_uf] = u_features[uid]
+            X[k, n_uf:] = i_features[iid]
+            w[k] = weight
 
         coef_labels = uf_labels + if_labels
         if self.add_interactions:
