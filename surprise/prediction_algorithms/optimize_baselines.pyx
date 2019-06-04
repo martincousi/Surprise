@@ -31,6 +31,8 @@ def baseline_als(self):
 
     cdef int u, i
     cdef double r, err, dev_i, dev_u
+    # global_mean can be computed as weighted mean or mean since the bias
+    # will only be pushed to bu and bi
     cdef double global_mean = self.trainset.global_mean
 
     cdef int n_epochs = self.bsl_options.get('n_epochs', 10)
@@ -92,6 +94,8 @@ def baseline_sgd(self):
 
     cdef int u, i
     cdef double r, err
+    # global_mean can be computed as weighted mean or mean since the bias
+    # will only be pushed to bu and bi
     cdef double global_mean = self.trainset.global_mean
 
     cdef int n_epochs = self.bsl_options.get('n_epochs', 20)

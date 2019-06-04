@@ -313,14 +313,18 @@ class Trainset:
 
         It's only computed once.
         """
-        if self._global_mean is None:
-            if self.sample_weight:
-                temp = [(r, w) for (_, _, r, w)
-                        in self.all_ratings(sample_weight=True)]
-                ratings, weights = list(zip(*temp))
-                self._global_mean = np.dot(weights, ratings) / np.sum(weights)
-            else:
-                self._global_mean = np.mean([r for (_, _, r) in
-                                             self.all_ratings()])
+
+        self._global_mean = np.mean([r for (_, _, r) in
+                                     self.all_ratings()])
+
+        # if self._global_mean is None:
+        #     if self.sample_weight:
+        #         temp = [(r, w) for (_, _, r, w)
+        #                 in self.all_ratings(sample_weight=True)]
+        #         ratings, weights = list(zip(*temp))
+        #         self._global_mean = np.dot(weights, ratings) / np.sum(weights)
+        #     else:
+        #         self._global_mean = np.mean([r for (_, _, r) in
+        #                                      self.all_ratings()])
 
         return self._global_mean
