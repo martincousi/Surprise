@@ -4,6 +4,8 @@ the :mod:`knns` module includes some k-NN inspired algorithms.
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import warnings
+
 import numpy as np
 from six import iteritems
 import heapq
@@ -93,6 +95,9 @@ class KNNBasic(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
+        warnings.warn('KNNBasic() currently does not use sample_weight',
+                      UserWarning)
+
     def fit(self, trainset):
 
         SymmetricAlgo.fit(self, trainset)
@@ -107,7 +112,7 @@ class KNNBasic(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(self.sim[x, x2], r) for (x2, r, w) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[0])
 
         # compute weighted average
@@ -171,6 +176,9 @@ class KNNWithMeans(SymmetricAlgo):
 
         self.k = k
         self.min_k = min_k
+
+        warnings.warn('KNNWithMeans() currently does not use sample_weight',
+                      UserWarning)
 
     def fit(self, trainset):
 
@@ -271,6 +279,9 @@ class KNNBaseline(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
+        warnings.warn('KNNBaseline() currently does not use sample_weight',
+                      UserWarning)
+
     def fit(self, trainset):
 
         SymmetricAlgo.fit(self, trainset)
@@ -362,6 +373,9 @@ class KNNWithZScore(SymmetricAlgo):
 
         self.k = k
         self.min_k = min_k
+
+        warnings.warn('KNNWithZScore() currently does not use sample_weight',
+                      UserWarning)
 
     def fit(self, trainset):
 
