@@ -80,9 +80,9 @@ class FM(AlgoBase):
         rating_lst : list of str or `None`, default : ['userID', 'itemID']
             This list specifies what information from the `raw_ratings` to put
             in the `x` vector. Accepted list values are 'userID', 'itemID',
-            'imp_u_rating' and 'exp_u_rating'. Implicit and explicit user
-            rating values are scaled by the number of values. If `None`, no
-            info is added.
+            'imp_u_rating', 'exp_u_rating', 'imp_u_rating' and 'exp_u_rating'.
+            Implicit and explicit user/item rating values are scaled by the
+            number of values. If `None`, no info is added.
         user_lst : list of str or `None`, default : `None`
             This list specifies what information from the `user_features` to
             put in the `x` vector. Accepted list values consist of the names of
@@ -256,7 +256,7 @@ class FM(AlgoBase):
                              'there are no item_features')
 
         n_ratings = self.trainset.n_ratings
-        # n_users = self.trainset.n_users
+        n_users = self.trainset.n_users
         n_items = self.trainset.n_items
 
         # Construct ratings_df from trainset
@@ -286,7 +286,7 @@ class FM(AlgoBase):
                     for row in ratings_df.itertuples():
                         iid = row.itemID
                         all_u_ratings = self.trainset.ur[row.userID]
-                        for other_iid, rating in all_u_ratings:
+                        for other_iid, rating, w in all_u_ratings:
                             if other_iid != iid:  # only the other ratings
                                 temp[row.Index, other_iid] = 1
                     count = np.count_nonzero(temp, axis=1)[:, None]
@@ -302,7 +302,7 @@ class FM(AlgoBase):
                     for row in ratings_df.itertuples():
                         iid = row.itemID
                         all_u_ratings = self.trainset.ur[row.userID]
-                        for other_iid, rating in all_u_ratings:
+                        for other_iid, rating, w in all_u_ratings:
                             if other_iid != iid:  # only the other ratings
                                 temp[row.Index, other_iid] = rating
                     count = np.count_nonzero(temp, axis=1)[:, None]
@@ -310,6 +310,37 @@ class FM(AlgoBase):
                     temp = temp / count
                     cols = ['exp_u_rating_{}'.format(i)
                             for i in range(n_items)]
+                    libsvm_df = pd.concat([libsvm_df, pd.DataFrame(
+                        temp, columns=cols)], axis=1)
+                elif feature == 'imp_i_rating':
+                    temp = np.zeros((n_ratings, n_users))
+                    for row in ratings_df.itertuples():
+                        uid = row.userID
+                        all_i_ratings = self.trainset.ir[row.itemID]
+                        for other_uid, rating, w in all_i_ratings:
+                            if other_uid != uid:  # only the other ratings
+                                temp[row.Index, other_uid] = 1
+                    count = np.count_nonzero(temp, axis=1)[:, None]
+                    count[count == 0] = 1  # remove zeros for division
+                    temp = temp / count
+                    cols = ['imp_i_rating_{}'.format(u)
+                            for u in range(n_users)]
+                    libsvm_df = pd.concat([libsvm_df, pd.DataFrame(
+                        temp, columns=cols)], axis=1)
+                elif feature == 'exp_i_rating':
+                    # a rating is at least 1 with the offset
+                    temp = np.zeros((n_ratings, n_users))
+                    for row in ratings_df.itertuples():
+                        uid = row.userID
+                        all_i_ratings = self.trainset.ir[row.itemID]
+                        for other_uid, rating, w in all_i_ratings:
+                            if other_uid != uid:  # only the other ratings
+                                temp[row.Index, other_uid] = rating
+                    count = np.count_nonzero(temp, axis=1)[:, None]
+                    count[count == 0] = 1  # remove zeros for division
+                    temp = temp / count
+                    cols = ['exp_i_rating_{}'.format(u)
+                            for u in range(n_users)]
                     libsvm_df = pd.concat([libsvm_df, pd.DataFrame(
                         temp, columns=cols)], axis=1)
                 else:
@@ -407,7 +438,7 @@ class FM(AlgoBase):
                     temp = [0.] * n_items
                     if self.trainset.knows_user(u):
                         all_u_ratings = self.trainset.ur[u]
-                        for other_i, rating in all_u_ratings:
+                        for other_i, rating, w in all_u_ratings:
                             if other_i != i:  # only the other ratings
                                 temp[other_i] = 1.
                         temp = np.array(temp)
@@ -421,9 +452,36 @@ class FM(AlgoBase):
                     temp = [0.] * n_items
                     if self.trainset.knows_user(u):
                         all_u_ratings = self.trainset.ur[u]
-                        for other_i, rating in all_u_ratings:
+                        for other_i, rating, w in all_u_ratings:
                             if other_i != i:  # only the other ratings
                                 temp[other_i] = rating
+                        temp = np.array(temp)
+                        count = np.count_nonzero(temp)
+                        if count == 0:
+                            count = 1
+                        temp = list(temp / count)
+                    x.extend(temp)
+                elif feature == 'imp_i_rating':
+                    temp = [0.] * n_users
+                    if self.trainset.knows_item(i):
+                        all_i_ratings = self.trainset.ir[i]
+                        for other_u, rating, w in all_i_ratings:
+                            if other_u != u:  # only the other ratings
+                                temp[other_u] = 1.
+                        temp = np.array(temp)
+                        count = np.count_nonzero(temp)
+                        if count == 0:
+                            count = 1
+                        temp = list(temp / count)
+                    x.extend(temp)
+                elif feature == 'exp_i_rating':
+                    # a rating is at least 1 with the offset
+                    temp = [0.] * n_users
+                    if self.trainset.knows_item(i):
+                        all_i_ratings = self.trainset.ir[i]
+                        for other_u, rating, w in all_i_ratings:
+                            if other_u != u:  # only the other ratings
+                                temp[other_u] = rating
                         temp = np.array(temp)
                         count = np.count_nonzero(temp)
                         if count == 0:
