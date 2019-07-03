@@ -29,7 +29,10 @@ class SymmetricAlgo(AlgoBase):
     reversed.
     """
 
-    def __init__(self, sim_options={}, verbose=False, **kwargs):
+    def __init__(self, sim_options=None, verbose=False, **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         AlgoBase.__init__(self, sim_options=sim_options, **kwargs)
         self.verbose = verbose
@@ -88,7 +91,11 @@ class KNNBasic(SymmetricAlgo):
             similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=False, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options, verbose=verbose,
                                **kwargs)
@@ -169,7 +176,11 @@ class KNNWithMeans(SymmetricAlgo):
             similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=False, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options,
                                verbose=verbose, **kwargs)
@@ -269,8 +280,13 @@ class KNNBaseline(SymmetricAlgo):
             similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, bsl_options={},
+    def __init__(self, k=40, min_k=1, sim_options=None, bsl_options=None,
                  verbose=False, **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
+        if bsl_options is None:
+            bsl_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options,
                                bsl_options=bsl_options, verbose=verbose,
@@ -366,7 +382,11 @@ class KNNWithZScore(SymmetricAlgo):
             similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=False, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options, verbose=verbose,
                                **kwargs)

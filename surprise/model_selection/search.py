@@ -18,7 +18,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
     """Base class for hyper parameter search with cross-validation."""
 
     @abstractmethod
-    def __init__(self, algo_class, measures=['rmse', 'mae'], cv=None,
+    def __init__(self, algo_class, measures=('rmse', 'mae'), cv=None,
                  refit=False, return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', joblib_verbose=0):
 
@@ -295,7 +295,7 @@ class GridSearchCV(BaseSearchCV):
             <cv_results_example>`).
     """
 
-    def __init__(self, algo_class, param_grid, measures=['rmse', 'mae'],
+    def __init__(self, algo_class, param_grid, measures=('rmse', 'mae'),
                  cv=None, refit=False, return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', joblib_verbose=0):
 
@@ -413,7 +413,7 @@ class RandomizedSearchCV(BaseSearchCV):
     """
 
     def __init__(self, algo_class, param_distributions, n_iter=10,
-                 measures=['rmse', 'mae'], cv=None, refit=False,
+                 measures=('rmse', 'mae'), cv=None, refit=False,
                  return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', random_state=None, joblib_verbose=0):
 

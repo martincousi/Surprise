@@ -25,7 +25,10 @@ class BaselineOnly(AlgoBase):
             similarity, etc.  Default is False.
     """
 
-    def __init__(self, bsl_options={}, verbose=False):
+    def __init__(self, bsl_options=None, verbose=False):
+
+        if bsl_options is None:
+            bsl_options = {}
 
         AlgoBase.__init__(self, bsl_options=bsl_options)
         self.verbose = verbose

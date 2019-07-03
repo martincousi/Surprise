@@ -21,7 +21,7 @@ from . import accuracy
 from .dump import dump
 
 
-def evaluate(algo, data, measures=['rmse', 'mae'], with_dump=False,
+def evaluate(algo, data, measures=('rmse', 'mae'), with_dump=False,
              dump_dir=None, verbose=1):
     """
     .. warning::
@@ -194,7 +194,7 @@ class GridSearch:
             measure.
         """
 
-    def __init__(self, algo_class, param_grid, measures=['rmse', 'mae'],
+    def __init__(self, algo_class, param_grid, measures=('rmse', 'mae'),
                  n_jobs=1, pre_dispatch='2*n_jobs', seed=None, verbose=1,
                  joblib_verbose=0):
         self.best_params = CaseInsensitiveDefaultDict(list)
