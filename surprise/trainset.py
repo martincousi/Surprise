@@ -27,12 +27,12 @@ class Trainset:
 
 
     Attributes:
-        ur(:obj:`defaultdict` of :obj:`list`): The users ratings. This is a
-            dictionary containing lists of tuples of the form ``(item_inner_id,
-            rating)``. The keys are user inner ids.
-        ir(:obj:`defaultdict` of :obj:`list`): The items ratings. This is a
-            dictionary containing lists of tuples of the form ``(user_inner_id,
-            rating)``. The keys are item inner ids.
+        ur(:obj:`defaultdict` of :obj:`list`): The (offsetted) users ratings.
+            This is a dictionary containing lists of tuples of the form
+            ``(item_inner_id, rating)``. The keys are user inner ids.
+        ir(:obj:`defaultdict` of :obj:`list`): The (offsetted) items ratings.
+            This is a dictionary containing lists of tuples of the form
+            ``(user_inner_id, rating)``. The keys are item inner ids.
         u_features(:obj:`defaultdict` of :obj:`list`): The user features. This
             is a dictionary containing lists of features. The keys are user
             inner ids.
@@ -308,23 +308,12 @@ class Trainset:
 
     @property
     def global_mean(self):
-        """Return the (weighted) mean of all ratings. When `sample_weight` is
-        provided, the weighted mean of all ratings is computed.
+        """Return the (offsetted) mean of all ratings.
 
         It's only computed once.
         """
 
         self._global_mean = np.mean([r for (_, _, r) in
                                      self.all_ratings()])
-
-        # if self._global_mean is None:
-        #     if self.sample_weight:
-        #         temp = [(r, w) for (_, _, r, w)
-        #                 in self.all_ratings(sample_weight=True)]
-        #         ratings, weights = list(zip(*temp))
-        #         self._global_mean = np.dot(weights, ratings) / np.sum(weights)
-        #     else:
-        #         self._global_mean = np.mean([r for (_, _, r) in
-        #                                      self.all_ratings()])
 
         return self._global_mean
