@@ -125,17 +125,17 @@ def fcp(predictions, verbose=True):
             for r0j, estj in preds:
                 if esti > estj and r0i > r0j:
                     nc_u[u0] += 1
-                if esti >= estj and r0i < r0j:
+                elif esti >= estj and r0i < r0j:
                     nd_u[u0] += 1
 
-    nc = np.mean(list(nc_u.values())) if nc_u else 0
-    nd = np.mean(list(nd_u.values())) if nd_u else 0
+    nc = sum(nc_u.values())
+    nd = sum(nd_u.values())
 
     try:
         fcp = nc / (nc + nd)
     except ZeroDivisionError:
-        raise ValueError('cannot compute fcp on this list of prediction. ' +
-                         'Does every user have at least two predictions?')
+        raise ValueError('cannot compute fcp on this list of prediction. '
+                         'Does some users have at least two predictions?')
 
     if verbose:
         print('FCP:  {0:1.4f}'.format(fcp))
