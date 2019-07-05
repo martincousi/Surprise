@@ -14,7 +14,7 @@ from .split import get_cv
 from .. import accuracy
 
 
-def cross_validate(algo, data, measures=('rmse', 'mae'), cv=None,
+def cross_validate(algo, data, measures=None, cv=None,
                    return_train_measures=False, n_jobs=1,
                    pre_dispatch='2*n_jobs', verbose=False):
     '''
@@ -29,9 +29,11 @@ def cross_validate(algo, data, measures=('rmse', 'mae'), cv=None,
             The algorithm to evaluate.
         data(:obj:`Dataset <surprise.dataset.Dataset>`): The dataset on which
             to evaluate the algorithm.
-        measures(list of string): The performance measures to compute. Allowed
-            names are function names as defined in the :mod:`accuracy
-            <surprise.accuracy>` module. Default is ``['rmse', 'mae']``.
+        measures(list of function callables with names): The performance
+            measures to compute. Allowed function callables take the output of
+            ``AlgoBase.test()`` as argument and return a score (where a higher
+            score is better). Default is ``[['neg_rmse', accuracy.neg_rmse],
+            ['neg_mae', accuracy.neg_mae]]``.
         cv(cross-validation iterator, int or ``None``): Determines how the
             ``data`` parameter will be split (i.e. how trainsets and testsets
             will be defined). If an int is passed, :class:`KFold
@@ -74,12 +76,12 @@ def cross_validate(algo, data, measures=('rmse', 'mae'), cv=None,
     Returns:
         dict: A dict with the following keys:
 
-            - ``'test_*'`` where ``*`` corresponds to a lower-case accuracy
-              measure, e.g. ``'test_rmse'``: numpy array with accuracy values
+            - ``'test_*'`` where ``*`` corresponds to a measure index,
+              e.g. ``'test_measure_0'``: numpy array with accuracy values
               for each testset.
 
-            - ``'train_*'`` where ``*`` corresponds to a lower-case accuracy
-              measure, e.g. ``'train_rmse'``: numpy array with accuracy values
+            - ``'train_*'`` where ``*`` corresponds to a measure index,
+              e.g. ``'train_measure_0'``: numpy array with accuracy values
               for each trainset. Only available if ``return_train_measures`` is
               ``True``.
 
@@ -91,7 +93,8 @@ def cross_validate(algo, data, measures=('rmse', 'mae'), cv=None,
 
     '''
 
-    measures = [m.lower() for m in measures]
+    if measures is None:
+        measures = [['neg_rmse', neg_rmse], ['neg_mae', neg_mae]]
 
     cv = get_cv(cv)
 
@@ -108,14 +111,15 @@ def cross_validate(algo, data, measures=('rmse', 'mae'), cv=None,
     test_measures = dict()
     train_measures = dict()
     ret = dict()
-    for m in measures:
+    for m, _ in measures:
         # transform list of dicts into dict of lists
         # Same as in GridSearchCV.fit()
-        test_measures[m] = np.asarray([d[m] for d in test_measures_dicts])
+        test_measures[m] = np.asarray(
+            [d[m] for d in test_measures_dicts])
         ret['test_' + m] = test_measures[m]
         if return_train_measures:
-            train_measures[m] = np.asarray([d[m] for d in
-                                            train_measures_dicts])
+            train_measures[m] = np.asarray(
+                [d[m] for d in train_measures_dicts])
             ret['train_' + m] = train_measures[m]
 
     ret['fit_time'] = fit_times
@@ -139,9 +143,10 @@ def fit_and_score(algo, trainset, testset, measures,
             The algorithm to use.
         trainset(:obj:`Trainset <surprise.trainset.Trainset>`): The trainset.
         trainset(:obj:`testset`): The testset.
-        measures(list of string): The performance measures to compute. Allowed
-            names are function names as defined in the :mod:`accuracy
-            <surprise.accuracy>` module.
+        measures(list of function callables with names): The performance
+            measures to compute. Allowed function callables take the output of
+            ``AlgoBase.test()`` as argument and return a score (where a higher
+            score is better).
         return_train_measures(bool): Whether to compute performance measures on
             the trainset. Default is ``False``.
 
@@ -149,11 +154,10 @@ def fit_and_score(algo, trainset, testset, measures,
         tuple: A tuple containing:
 
             - A dictionary mapping each accuracy metric to its value on the
-            testset (keys are lower case).
+            testset.
 
             - A dictionary mapping each accuracy metric to its value on the
-            trainset (keys are lower case). This dict is empty if
-            return_train_measures is False.
+            trainset. This dict is empty if return_train_measures is False.
 
             - The fit time in seconds.
 
@@ -172,11 +176,10 @@ def fit_and_score(algo, trainset, testset, measures,
 
     test_measures = dict()
     train_measures = dict()
-    for m in measures:
-        f = getattr(accuracy, m.lower())
-        test_measures[m] = f(predictions, verbose=0)
+    for m, f in measures:
+        test_measures[m] = f(predictions)
         if return_train_measures:
-            train_measures[m] = f(train_predictions, verbose=0)
+            train_measures[m] = f(train_predictions)
 
     return test_measures, train_measures, fit_time, test_time
 
@@ -186,7 +189,7 @@ def print_summary(algo, measures, test_measures, train_measures, fit_times,
     '''Helper for printing the result of cross_validate.'''
 
     print('Evaluating {0} of algorithm {1} on {2} split(s).'.format(
-          ', '.join((m.upper() for m in measures)),
+          ', '.join((m for m, _ in measures)),
           algo.__class__.__name__, n_splits))
     print()
 

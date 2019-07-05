@@ -10,6 +10,7 @@ from six import moves, string_types, with_metaclass
 
 from .split import get_cv
 from .validation import fit_and_score
+from .. import accuracy
 from ..dataset import DatasetUserFolds
 from ..utils import get_rng
 
@@ -18,28 +19,17 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
     """Base class for hyper parameter search with cross-validation."""
 
     @abstractmethod
-    def __init__(self, algo_class, measures=('rmse', 'mae'), cv=None,
+    def __init__(self, algo_class, measures=None, cv=None,
                  refit=False, return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', joblib_verbose=0):
 
         self.algo_class = algo_class
-        self.measures = [measure.lower() for measure in measures]
+        if measures is None:
+            measures = [['neg_rmse', accuracy.neg_rmse],
+                        ['neg_mae', accuracy.neg_mae]]
+        self.measures = measures
         self.cv = cv
-
-        if isinstance(refit, string_types):
-            if refit.lower() not in self.measures:
-                raise ValueError('It looks like the measure you want to use '
-                                 'with refit ({}) is not in the measures '
-                                 'parameter')
-
-            self.refit = refit.lower()
-
-        elif refit is True:
-            self.refit = self.measures[0]
-
-        else:
-            self.refit = False
-
+        self.refit = refit  # if True, takes first measure in self.measures
         self.return_train_measures = return_train_measures
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
@@ -95,12 +85,12 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
          test_times) = zip(*out)
 
         # test_measures_dicts is a list of dict like this:
-        # [{'mae': 1, 'rmse': 2}, {'mae': 2, 'rmse': 3} ...]
+        # [{'rmse': 1, 'mae': 2}, {'rmse': 2, 'mae': 3}]
         # E.g. for 5 splits, the first 5 dicts are for the first param
         # combination, the next 5 dicts are for the second param combination,
         # etc...
         # We convert it into a dict of list:
-        # {'mae': [1, 2, ...], 'rmse': [2, 3, ...]}
+        # {'rmse': [1, 2, ...], 'mae': [2, 3, ...]}
         # Each list is still of size n_parameters_combinations * n_splits.
         # Then, reshape each list to have 2-D arrays of shape
         # (n_parameters_combinations, n_splits). This way we can easily compute
@@ -108,7 +98,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         test_measures = dict()
         train_measures = dict()
         new_shape = (len(self.param_combinations), cv.get_n_folds())
-        for m in self.measures:
+        for m, _ in self.measures:
             test_measures[m] = np.asarray([d[m] for d in test_measures_dicts])
             test_measures[m] = test_measures[m].reshape(new_shape)
             if self.return_train_measures:
@@ -121,7 +111,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         best_params = dict()
         best_score = dict()
         best_estimator = dict()
-        for m in self.measures:
+        for m, _ in self.measures:
             # cv_results: set measures for each split and each param comb
             for split in range(cv.get_n_folds()):
                 cv_results['split{0}_test_{1}'.format(split, m)] = \
@@ -142,16 +132,15 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
                     train_measures[m].std(axis=1)
 
             # cv_results: set rank of each param comb
-            indices = cv_results['mean_test_{}'.format(m)].argsort()
+            # we assume higher score is better as in sklearn
+            indices = cv_results['mean_test_{}'.format(m)].argsort()[::-1]
             cv_results['rank_test_{}'.format(m)] = np.empty_like(indices)
             cv_results['rank_test_{}'.format(m)][indices] = np.arange(
                 len(indices)) + 1  # sklearn starts rankings at 1 as well.
 
             # set best_index, and best_xxxx attributes
-            if m in ('mae', 'rmse'):
-                best_index[m] = mean_test_measures.argmin()
-            elif m in ('fcp',):
-                best_index[m] = mean_test_measures.argmax()
+            # we assume higher score is better as in sklearn
+            best_index[m] = mean_test_measures.argmax()
             best_params[m] = self.param_combinations[best_index[m]]
             best_score[m] = mean_test_measures[best_index[m]]
             best_estimator[m] = self.algo_class(**best_params[m])
@@ -170,7 +159,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
                                             self.param_combinations]
 
         if self.refit:
-            best_estimator[self.refit].fit(data.build_full_trainset())
+            best_estimator[self.measures[0][0]].fit(data.build_full_trainset())
 
         self.best_index = best_index
         self.best_params = best_params
@@ -189,7 +178,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         if not self.refit:
             raise ValueError('refit is False, cannot use test()')
 
-        return self.best_estimator[self.refit].test(testset, verbose)
+        return self.best_estimator[self.measures[0][0]].test(testset, verbose)
 
     def predict(self, *args):
         """Call ``predict()`` on the estimator with the best found parameters
@@ -202,7 +191,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         if not self.refit:
             raise ValueError('refit is False, cannot use predict()')
 
-        return self.best_estimator[self.refit].predict(*args)
+        return self.best_estimator[self.measures[0][0]].predict(*args)
 
 
 class GridSearchCV(BaseSearchCV):
@@ -223,9 +212,11 @@ class GridSearchCV(BaseSearchCV):
             list of values as keys. All combinations will be evaluated with
             desired algorithm. Dict parameters such as ``sim_options`` require
             special treatment, see :ref:`this note<grid_search_note>`.
-        measures(list of string): The performance measures to compute. Allowed
-            names are function names as defined in the :mod:`accuracy
-            <surprise.accuracy>` module.  Default is ``['rmse', 'mae']``.
+        measures(list of function callables with names): The performance
+            measures to compute. Allowed function callables take the output of
+            ``AlgoBase.test()`` as argument and return a score (where a higher
+            score is better). Default is ``[['neg_rmse', accuracy.neg_rmse],
+            ['neg_mae', accuracy.neg_mae]]``.
         cv(cross-validation iterator, int or ``None``): Determines how the
             ``data`` parameter will be split (i.e. how trainsets and testsets
             will be defined). If an int is passed, :class:`KFold
@@ -233,13 +224,12 @@ class GridSearchCV(BaseSearchCV):
             appropriate ``n_splits`` parameter. If ``None``, :class:`KFold
             <surprise.model_selection.split.KFold>` is used with
             ``n_splits=5``.
-        refit(bool or str): If ``True``, refit the algorithm on the whole
+        refit(bool): If ``True``, refit the algorithm on the whole
             dataset using the set of parameters that gave the best average
-            performance for the first measure of ``measures``. Other measures
-            can be used by passing a string (corresponding to the measure
-            name). Then, you can use the ``test()`` and ``predict()`` methods.
-            ``refit`` can only be used if the ``data`` parameter given to
-            ``fit()`` hasn't been loaded with :meth:`load_from_folds()
+            performance for the first measure of ``measures``. Then, you can use
+            the ``test()`` and ``predict()`` methods. ``refit`` can only be
+            used if the ``data`` parameter given to ``fit()`` hasn't been
+            loaded with :meth:`load_from_folds()
             <surprise.dataset.Dataset.load_from_folds>`. Default is ``False``.
         return_train_measures(bool): Whether to compute performance measures on
             the trainsets. If ``True``, the ``cv_results`` attribute will
@@ -295,7 +285,7 @@ class GridSearchCV(BaseSearchCV):
             <cv_results_example>`).
     """
 
-    def __init__(self, algo_class, param_grid, measures=('rmse', 'mae'),
+    def __init__(self, algo_class, param_grid, measures=None,
                  cv=None, refit=False, return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', joblib_verbose=0):
 
@@ -333,9 +323,11 @@ class RandomizedSearchCV(BaseSearchCV):
             uniformly. Parameters will be sampled n_iter times.
         n_iter(int): Number of times parameter settings are sampled. Default is
             ``10``.
-        measures(list of string): The performance measures to compute. Allowed
-            names are function names as defined in the :mod:`accuracy
-            <surprise.accuracy>` module.  Default is ``['rmse', 'mae']``.
+        measures(list of function callables with names): The performance
+            measures to compute. Allowed function callables take the output of
+            ``AlgoBase.test()`` as argument and return a score (where a higher
+            score is better). Default is ``[['neg_rmse', accuracy.neg_rmse],
+            ['neg_mae', accuracy.neg_mae]]``.
         cv(cross-validation iterator, int or ``None``): Determines how the
             ``data`` parameter will be split (i.e. how trainsets and testsets
             will be defined). If an int is passed, :class:`KFold
@@ -343,13 +335,12 @@ class RandomizedSearchCV(BaseSearchCV):
             appropriate ``n_splits`` parameter. If ``None``, :class:`KFold
             <surprise.model_selection.split.KFold>` is used with
             ``n_splits=5``.
-        refit(bool or str): If ``True``, refit the algorithm on the whole
+        refit(bool): If ``True``, refit the algorithm on the whole
             dataset using the set of parameters that gave the best average
-            performance for the first measure of ``measures``. Other measures
-            can be used by passing a string (corresponding to the measure
-            name). Then, you can use the ``test()`` and ``predict()`` methods.
-            ``refit`` can only be used if the ``data`` parameter given to
-            ``fit()`` hasn't been loaded with :meth:`load_from_folds()
+            performance for the first measure of ``measures``. Then, you can use
+            the ``test()`` and ``predict()`` methods. ``refit`` can only be
+            used if the ``data`` parameter given to ``fit()`` hasn't been
+            loaded with :meth:`load_from_folds()
             <surprise.dataset.Dataset.load_from_folds>`. Default is ``False``.
         return_train_measures(bool): Whether to compute performance measures on
             the trainsets. If ``True``, the ``cv_results`` attribute will
@@ -413,7 +404,7 @@ class RandomizedSearchCV(BaseSearchCV):
     """
 
     def __init__(self, algo_class, param_distributions, n_iter=10,
-                 measures=('rmse', 'mae'), cv=None, refit=False,
+                 measures=None, cv=None, refit=False,
                  return_train_measures=False, n_jobs=1,
                  pre_dispatch='2*n_jobs', random_state=None, joblib_verbose=0):
 

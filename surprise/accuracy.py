@@ -1,6 +1,7 @@
 """
 The :mod:`surprise.accuracy` module provides with tools for computing accuracy
-metrics on a set of predictions.
+metrics on a set of predictions. We assume higher is always better as in
+sklearn and hence we sometime return the opposite of a metric.
 
 Available accuracy metrics:
 
@@ -19,11 +20,11 @@ import numpy as np
 from six import iteritems
 
 
-def rmse(predictions, verbose=True):
-    """Compute RMSE (Root Mean Squared Error).
+def neg_rmse(predictions, verbose=False):
+    """Compute the negative RMSE (Root Mean Squared Error).
 
     .. math::
-        \\text{RMSE} = \\sqrt{\\frac{1}{|\\hat{R}|} \\sum_{\\hat{r}_{ui} \in
+        \\text{RMSE} = - \\sqrt{\\frac{1}{|\\hat{R}|} \\sum_{\\hat{r}_{ui} \in
         \\hat{R}}(r_{ui} - \\hat{r}_{ui})^2}.
 
     Args:
@@ -31,11 +32,11 @@ def rmse(predictions, verbose=True):
             <surprise.prediction_algorithms.predictions.Prediction>`):
             A list of predictions, as returned by the :meth:`test()
             <surprise.prediction_algorithms.algo_base.AlgoBase.test>` method.
-        verbose: If True, will print computed value. Default is ``True``.
+        verbose: If True, will print computed value. Default is ``False``.
 
 
     Returns:
-        The Root Mean Squared Error of predictions.
+        The negative Root Mean Squared Error of predictions.
 
     Raises:
         ValueError: When ``predictions`` is empty.
@@ -51,14 +52,14 @@ def rmse(predictions, verbose=True):
     if verbose:
         print('RMSE: {0:1.4f}'.format(rmse_))
 
-    return rmse_
+    return -rmse_
 
 
-def mae(predictions, verbose=True):
-    """Compute MAE (Mean Absolute Error).
+def neg_mae(predictions, verbose=False):
+    """Compute the negative MAE (Mean Absolute Error).
 
     .. math::
-        \\text{MAE} = \\frac{1}{|\\hat{R}|} \\sum_{\\hat{r}_{ui} \in
+        \\text{MAE} = - \\frac{1}{|\\hat{R}|} \\sum_{\\hat{r}_{ui} \in
         \\hat{R}}|r_{ui} - \\hat{r}_{ui}|
 
     Args:
@@ -70,7 +71,7 @@ def mae(predictions, verbose=True):
 
 
     Returns:
-        The Mean Absolute Error of predictions.
+        The negative Mean Absolute Error of predictions.
 
     Raises:
         ValueError: When ``predictions`` is empty.
@@ -85,10 +86,10 @@ def mae(predictions, verbose=True):
     if verbose:
         print('MAE:  {0:1.4f}'.format(mae_))
 
-    return mae_
+    return -mae_
 
 
-def fcp(predictions, verbose=True):
+def fcp(predictions, verbose=False):
     """Compute FCP (Fraction of Concordant Pairs).
 
     Computed as described in paper `Collaborative Filtering on Ordinal User
@@ -100,7 +101,7 @@ def fcp(predictions, verbose=True):
             <surprise.prediction_algorithms.predictions.Prediction>`):
             A list of predictions, as returned by the :meth:`test()
             <surprise.prediction_algorithms.algo_base.AlgoBase.test>` method.
-        verbose: If True, will print computed value. Default is ``True``.
+        verbose: If True, will print computed value. Default is ``False``.
 
 
     Returns:
