@@ -362,9 +362,9 @@ def test_randomizedsearchcv_refit():
                             cv=2, refit=True)
     rs.fit(data)
     rs_preds = rs.test(data.construct_testset(data.raw_ratings))
-    neg_rmse = rs.best_estimator['neg_rmse'].test(
+    rmse_res = rs.best_estimator['neg_rmse'].test(
         data.construct_testset(data.raw_ratings))
-    assert rs_preds == neg_rmse
+    assert rs_preds == rmse_res
 
     # assert test() and predict() cannot be used when refit is false
     rs = RandomizedSearchCV(SVD, param_distributions,
