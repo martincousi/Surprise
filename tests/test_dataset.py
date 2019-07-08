@@ -195,14 +195,14 @@ def test_trainset_testset():
 
     # test ur
     ur = trainset.ur
-    assert ur[0] == [(0, 4)]
-    assert ur[1] == [(0, 4), (1, 2)]
+    assert ur[0] == [(0, 4, None)]
+    assert ur[1] == [(0, 4, None), (1, 2, None)]
     assert ur[40] == []  # not in the trainset
 
     # test ir
     ir = trainset.ir
-    assert ir[0] == [(0, 4), (1, 4), (2, 1)]
-    assert ir[1] == [(1, 2), (2, 1), (3, 5)]
+    assert ir[0] == [(0, 4, None), (1, 4, None), (2, 1, None)]
+    assert ir[1] == [(1, 2, None), (2, 1, None), (3, 5, None)]
     assert ir[20000] == []  # not in the trainset
 
     # test n_users, n_items, n_ratings, rating_scale
@@ -298,14 +298,14 @@ def test_trainset_testset_ui_features():
 
     # test ur
     ur = trainset.ur
-    assert ur[0] == [(0, 4)]
-    assert ur[1] == [(0, 4), (1, 2)]
+    assert ur[0] == [(0, 4, None)]
+    assert ur[1] == [(0, 4, None), (1, 2, None)]
     assert ur[40] == []  # not in the trainset
 
     # test ir
     ir = trainset.ir
-    assert ir[0] == [(0, 4), (1, 4), (2, 1)]
-    assert ir[1] == [(1, 2), (2, 1), (3, 5)]
+    assert ir[0] == [(0, 4, None), (1, 4, None), (2, 1, None)]
+    assert ir[1] == [(1, 2, None), (2, 1, None), (3, 5, None)]
     assert ir[20000] == []  # not in the trainset
 
     # test n_users, n_items, n_ratings, rating_scale
@@ -401,8 +401,8 @@ def test_load_form_df():
     uid9 = trainset.to_inner_uid(9)
     uid2 = trainset.to_inner_uid(2)
     iid1 = trainset.to_inner_iid(1)
-    assert trainset.ur[uid9] == [(iid1, 3)]
-    assert trainset.ur[uid2] == [(iid1, 4)]
+    assert trainset.ur[uid9] == [(iid1, 3, None)]
+    assert trainset.ur[uid2] == [(iid1, 4, None)]
 
     # assert at least rating file or dataframe must be specified
     with pytest.raises(ValueError):

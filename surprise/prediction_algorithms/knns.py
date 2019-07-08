@@ -119,7 +119,7 @@ class KNNBasic(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(self.sim[x, x2], r) for (x2, r, w) in self.yr[y]]
+        neighbors = [(self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[0])
 
         # compute weighted average
@@ -198,7 +198,7 @@ class KNNWithMeans(SymmetricAlgo):
 
         self.means = np.zeros(self.n_x)
         for x, ratings in iteritems(self.xr):
-            self.means[x] = np.mean([r for (_, r) in ratings])
+            self.means[x] = np.mean([r for (_, r, _) in ratings])
 
         return self
 
@@ -209,7 +209,7 @@ class KNNWithMeans(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         est = self.means[x]
@@ -320,7 +320,7 @@ class KNNBaseline(SymmetricAlgo):
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
             return est
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         # compute weighted average
@@ -408,8 +408,8 @@ class KNNWithZScore(SymmetricAlgo):
                                      in self.trainset.all_ratings()])
 
         for x, ratings in iteritems(self.xr):
-            self.means[x] = np.mean([r for (_, r) in ratings])
-            sigma = np.std([r for (_, r) in ratings])
+            self.means[x] = np.mean([r for (_, r, _) in ratings])
+            sigma = np.std([r for (_, r, _) in ratings])
             self.sigmas[x] = self.overall_sigma if sigma == 0.0 else sigma
 
         self.sim = self.compute_similarities()
@@ -423,7 +423,7 @@ class KNNWithZScore(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         est = self.means[x]

@@ -14,9 +14,9 @@ from surprise import KNNWithMeans
 from surprise import KNNBaseline
 from surprise import Dataset
 from surprise import Reader
+from surprise.accuracy import neg_rmse
 from surprise.model_selection import cross_validate
 from surprise.model_selection import PredefinedKFold
-
 
 # the test and train files are from the ml-100k dataset (10% of u1.base and
 # 10 % of u1.test)
@@ -31,20 +31,24 @@ def test_name_field():
 
     sim_options = {'name': 'cosine'}
     algo = KNNBasic(sim_options=sim_options)
-    rmse_cosine = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_cosine = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
 
     sim_options = {'name': 'msd'}
     algo = KNNBasic(sim_options=sim_options)
-    rmse_msd = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_msd = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
 
     sim_options = {'name': 'pearson'}
     algo = KNNBasic(sim_options=sim_options)
-    rmse_pearson = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_pearson = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
 
     sim_options = {'name': 'pearson_baseline'}
     bsl_options = {'n_epochs': 1}
     algo = KNNBasic(sim_options=sim_options, bsl_options=bsl_options)
-    rmse_pearson_bsl = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_pearson_bsl = \
+    cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)['test_neg_rmse']
 
     for rmse_a, rmse_b in combinations((rmse_cosine, rmse_msd, rmse_pearson,
                                         rmse_pearson_bsl), 2):
@@ -53,7 +57,7 @@ def test_name_field():
     with pytest.raises(NameError):
         sim_options = {'name': 'wrong_name'}
         algo = KNNBasic(sim_options=sim_options)
-        cross_validate(algo, data, ['rmse'], pkf)
+        cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)
 
 
 def test_user_based_field():
@@ -63,11 +67,11 @@ def test_user_based_field():
     algorithms = (KNNBasic, KNNWithMeans, KNNBaseline)
     for klass in algorithms:
         algo = klass(sim_options={'user_based': True})
-        rmses_user_based = cross_validate(algo, data, ['rmse'],
-                                          pkf)['test_rmse']
+        rmses_user_based = cross_validate(algo, data, [['neg_rmse', neg_rmse]],
+                                          pkf)['test_neg_rmse']
         algo = klass(sim_options={'user_based': False})
-        rmses_item_based = cross_validate(algo, data, ['rmse'],
-                                          pkf)['test_rmse']
+        rmses_item_based = cross_validate(algo, data, [['neg_rmse', neg_rmse]],
+                                          pkf)['test_neg_rmse']
         assert rmses_user_based != rmses_item_based
 
 
@@ -79,13 +83,15 @@ def test_shrinkage_field():
                    }
     bsl_options = {'n_epochs': 1}
     algo = KNNBasic(sim_options=sim_options)
-    rmse_shrinkage_0 = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_shrinkage_0 = \
+    cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)['test_neg_rmse']
 
     sim_options = {'name': 'pearson_baseline',
                    'shrinkage': 100
                    }
     bsl_options = {'n_epochs': 1}
     algo = KNNBasic(sim_options=sim_options, bsl_options=bsl_options)
-    rmse_shrinkage_100 = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_shrinkage_100 = \
+    cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)['test_neg_rmse']
 
     assert rmse_shrinkage_0 != rmse_shrinkage_100

@@ -13,6 +13,7 @@ from scipy.stats import randint, uniform
 from surprise import Dataset
 from surprise import Reader
 from surprise import SVD
+from surprise.accuracy import neg_rmse, neg_mae
 from surprise.model_selection import KFold
 from surprise.model_selection import PredefinedKFold
 from surprise.model_selection import GridSearchCV, RandomizedSearchCV
@@ -63,16 +64,16 @@ def test_gridsearchcv_best_estimator():
 
     param_grid = {'n_epochs': [5], 'lr_all': [0.002, 0.005],
                   'reg_all': [0.4, 0.6], 'n_factors': [1], 'init_std_dev': [0]}
-    gs = GridSearchCV(SVD, param_grid, measures=['mae'],
+    gs = GridSearchCV(SVD, param_grid, measures=[['neg_mae', neg_mae]],
                       cv=PredefinedKFold(), joblib_verbose=100)
     gs.fit(data)
-    best_estimator = gs.best_estimator['mae']
+    best_estimator = gs.best_estimator['neg_mae']
 
     # recompute MAE of best_estimator
-    mae = cross_validate(best_estimator, data, measures=['MAE'],
-                         cv=PredefinedKFold())['test_mae']
+    mae = cross_validate(best_estimator, data, measures=[['neg_mae', neg_mae]],
+                         cv=PredefinedKFold())['test_neg_mae']
 
-    assert mae == gs.best_score['mae']
+    assert mae == gs.best_score['neg_mae']
 
 
 def test_gridsearchcv_same_splits():
@@ -87,18 +88,18 @@ def test_gridsearchcv_same_splits():
     # all RMSE should be the same (as param combinations are the same)
     param_grid = {'n_epochs': [5], 'lr_all': [.2, .2],
                   'reg_all': [.4, .4], 'n_factors': [5], 'random_state': [0]}
-    gs = GridSearchCV(SVD, param_grid, measures=['RMSE'], cv=kf,
+    gs = GridSearchCV(SVD, param_grid, measures=[['neg_rmse', neg_rmse]], cv=kf,
                       n_jobs=1)
     gs.fit(data)
 
-    rmse_scores = [m for m in gs.cv_results['mean_test_rmse']]
+    rmse_scores = [m for m in gs.cv_results['mean_test_neg_rmse']]
     assert len(set(rmse_scores)) == 1  # assert rmse_scores are all equal
 
     # Note: actually, even when setting random_state=None in kf, the same folds
     # are used because we use product(param_comb, kf.split(...)). However, it's
     # needed to have the same folds when calling fit again:
     gs.fit(data)
-    rmse_scores += [m for m in gs.cv_results['mean_test_rmse']]
+    rmse_scores += [m for m in gs.cv_results['mean_test_neg_rmse']]
     assert len(set(rmse_scores)) == 1  # assert rmse_scores are all equal
 
 
@@ -110,37 +111,37 @@ def test_gridsearchcv_cv_results():
     kf = KFold(3, shuffle=True, random_state=4)
     param_grid = {'n_epochs': [5], 'lr_all': [.2, .2],
                   'reg_all': [.4, .4], 'n_factors': [5], 'random_state': [0]}
-    gs = GridSearchCV(SVD, param_grid, measures=['RMSE', 'mae'], cv=kf,
+    gs = GridSearchCV(SVD, param_grid, measures=None, cv=kf,
                       return_train_measures=True)
     gs.fit(data)
 
-    # test keys split*_test_rmse, mean and std dev.
-    assert gs.cv_results['split0_test_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['split1_test_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['split2_test_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['mean_test_rmse'].shape == (4,)  # 4 param comb.
-    assert np.allclose(gs.cv_results['mean_test_rmse'],
-                       np.mean([gs.cv_results['split0_test_rmse'],
-                                gs.cv_results['split1_test_rmse'],
-                                gs.cv_results['split2_test_rmse']], axis=0))
-    assert np.allclose(gs.cv_results['std_test_rmse'],
-                       np.std([gs.cv_results['split0_test_rmse'],
-                               gs.cv_results['split1_test_rmse'],
-                               gs.cv_results['split2_test_rmse']], axis=0))
+    # test keys split*_test_neg_rmse, mean and std dev.
+    assert gs.cv_results['split0_test_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['split1_test_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['split2_test_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['mean_test_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert np.allclose(gs.cv_results['mean_test_neg_rmse'],
+                       np.mean([gs.cv_results['split0_test_neg_rmse'],
+                                gs.cv_results['split1_test_neg_rmse'],
+                                gs.cv_results['split2_test_neg_rmse']], axis=0))
+    assert np.allclose(gs.cv_results['std_test_neg_rmse'],
+                       np.std([gs.cv_results['split0_test_neg_rmse'],
+                               gs.cv_results['split1_test_neg_rmse'],
+                               gs.cv_results['split2_test_neg_rmse']], axis=0))
 
     # test keys split*_train_mae, mean and std dev.
-    assert gs.cv_results['split0_train_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['split1_train_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['split2_train_rmse'].shape == (4,)  # 4 param comb.
-    assert gs.cv_results['mean_train_rmse'].shape == (4,)  # 4 param comb.
-    assert np.allclose(gs.cv_results['mean_train_rmse'],
-                       np.mean([gs.cv_results['split0_train_rmse'],
-                                gs.cv_results['split1_train_rmse'],
-                                gs.cv_results['split2_train_rmse']], axis=0))
-    assert np.allclose(gs.cv_results['std_train_rmse'],
-                       np.std([gs.cv_results['split0_train_rmse'],
-                               gs.cv_results['split1_train_rmse'],
-                               gs.cv_results['split2_train_rmse']], axis=0))
+    assert gs.cv_results['split0_train_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['split1_train_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['split2_train_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert gs.cv_results['mean_train_neg_rmse'].shape == (4,)  # 4 param comb.
+    assert np.allclose(gs.cv_results['mean_train_neg_rmse'],
+                       np.mean([gs.cv_results['split0_train_neg_rmse'],
+                                gs.cv_results['split1_train_neg_rmse'],
+                                gs.cv_results['split2_train_neg_rmse']], axis=0))
+    assert np.allclose(gs.cv_results['std_train_neg_rmse'],
+                       np.std([gs.cv_results['split0_train_neg_rmse'],
+                               gs.cv_results['split1_train_neg_rmse'],
+                               gs.cv_results['split2_train_neg_rmse']], axis=0))
 
     # test fit and train times dimensions.
     assert gs.cv_results['mean_fit_time'].shape == (4,)  # 4 param comb.
@@ -152,10 +153,10 @@ def test_gridsearchcv_cv_results():
 
     # assert that best parameter in gs.cv_results['rank_test_measure'] is
     # indeed the best_param attribute.
-    best_index = np.argmin(gs.cv_results['rank_test_rmse'])
-    assert gs.cv_results['params'][best_index] == gs.best_params['rmse']
-    best_index = np.argmin(gs.cv_results['rank_test_mae'])
-    assert gs.cv_results['params'][best_index] == gs.best_params['mae']
+    best_index = np.argmin(gs.cv_results['rank_test_neg_rmse'])
+    assert gs.cv_results['params'][best_index] == gs.best_params['neg_rmse']
+    best_index = np.argmin(gs.cv_results['rank_test_neg_mae'])
+    assert gs.cv_results['params'][best_index] == gs.best_params['neg_mae']
 
 
 def test_gridsearchcv_refit():
@@ -169,28 +170,19 @@ def test_gridsearchcv_refit():
 
     # assert gs.fit() and gs.test will use best estimator for mae (first
     # appearing in measures)
-    gs = GridSearchCV(SVD, param_grid, measures=['mae', 'rmse'], cv=2,
-                      refit=True)
+    gs = GridSearchCV(SVD, param_grid, measures=[['neg_mae', neg_mae],
+                                                 ['neg_rmse', neg_rmse]],
+                      cv=2, refit=True)
     gs.fit(data)
     gs_preds = gs.test(data.construct_testset(data.raw_ratings))
-    mae_preds = gs.best_estimator['mae'].test(
+    mae_preds = gs.best_estimator['neg_mae'].test(
         data.construct_testset(data.raw_ratings))
     assert gs_preds == mae_preds
 
-    # assert gs.fit() and gs.test will use best estimator for rmse
-    gs = GridSearchCV(SVD, param_grid, measures=['mae', 'rmse'], cv=2,
-                      refit='rmse')
-    gs.fit(data)
-    gs_preds = gs.test(data.construct_testset(data.raw_ratings))
-    rmse_preds = gs.best_estimator['rmse'].test(
-        data.construct_testset(data.raw_ratings))
-    assert gs_preds == rmse_preds
-    # test that predict() can be called
-    gs.predict(2, 4)
-
     # assert test() and predict() cannot be used when refit is false
-    gs = GridSearchCV(SVD, param_grid, measures=['mae', 'rmse'], cv=2,
-                      refit=False)
+    gs = GridSearchCV(SVD, param_grid, measures=[['neg_mae', neg_mae],
+                                                 ['neg_rmse', neg_rmse]],
+                      cv=2, refit=False)
     gs.fit(data)
     with pytest.raises(ValueError):
         gs_preds = gs.test(data.construct_testset(data.raw_ratings))
@@ -202,8 +194,9 @@ def test_gridsearchcv_refit():
     test_file = os.path.join(os.path.dirname(__file__), './u1_ml100k_test')
     data = Dataset.load_from_folds([(train_file, test_file)],
                                    Reader('ml-100k'))
-    gs = GridSearchCV(SVD, param_grid, measures=['mae', 'rmse'], cv=2,
-                      refit=True)
+    gs = GridSearchCV(SVD, param_grid, measures=[['neg_mae', neg_mae],
+                                                 ['neg_rmse', neg_rmse]],
+                      cv=2, refit=True)
     with pytest.raises(ValueError):
         gs.fit(data)
 
@@ -249,16 +242,18 @@ def test_randomizedsearchcv_best_estimator():
     param_distributions = {'n_epochs': [5], 'lr_all': uniform(0.002, 0.003),
                            'reg_all': uniform(0.04, 0.02), 'n_factors': [1],
                            'init_std_dev': [0]}
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['mae'],
+    rs = RandomizedSearchCV(SVD, param_distributions, measures=[['neg_mae',
+                                                                 neg_mae]],
                             cv=PredefinedKFold(), joblib_verbose=100)
     rs.fit(data)
-    best_estimator = rs.best_estimator['mae']
+    best_estimator = rs.best_estimator['neg_mae']
 
     # recompute MAE of best_estimator
-    mae = cross_validate(best_estimator, data, measures=['MAE'],
-                         cv=PredefinedKFold())['test_mae']
+    mae = cross_validate(best_estimator, data, measures=[['neg_mae',
+                                                          neg_mae]],
+                         cv=PredefinedKFold())['test_neg_mae']
 
-    assert mae == rs.best_score['mae']
+    assert mae == rs.best_score['neg_mae']
 
 
 def test_randomizedsearchcv_same_splits():
@@ -274,18 +269,19 @@ def test_randomizedsearchcv_same_splits():
     param_distributions = {'n_epochs': [5], 'lr_all': uniform(.2, 0),
                            'reg_all': uniform(.4, 0), 'n_factors': [5],
                            'random_state': [0]}
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['RMSE'], cv=kf,
-                            n_jobs=1)
+    rs = RandomizedSearchCV(SVD, param_distributions, measures=[['neg_rmse',
+                                                                 neg_rmse]],
+                            cv=kf, n_jobs=1)
     rs.fit(data)
 
-    rmse_scores = [m for m in rs.cv_results['mean_test_rmse']]
+    rmse_scores = [m for m in rs.cv_results['mean_test_neg_rmse']]
     assert len(set(rmse_scores)) == 1  # assert rmse_scores are all equal
 
     # Note: actually, even when setting random_state=None in kf, the same folds
     # are used because we use product(param_comb, kf.split(...)). However, it's
     # needed to have the same folds when calling fit again:
     rs.fit(data)
-    rmse_scores += [m for m in rs.cv_results['mean_test_rmse']]
+    rmse_scores += [m for m in rs.cv_results['mean_test_neg_rmse']]
     assert len(set(rmse_scores)) == 1  # assert rmse_scores are all equal
 
 
@@ -300,37 +296,38 @@ def test_randomizedsearchcv_cv_results():
                            'random_state': [0]}
     n_iter = 5
     rs = RandomizedSearchCV(SVD, param_distributions, n_iter=n_iter,
-                            measures=['RMSE', 'mae'], cv=kf,
+                            measures=[['neg_rmse', neg_rmse], ['neg_mae',
+                                                               neg_mae]], cv=kf,
                             return_train_measures=True)
     rs.fit(data)
 
     # test keys split*_test_rmse, mean and std dev.
-    assert rs.cv_results['split0_test_rmse'].shape == (n_iter,)
-    assert rs.cv_results['split1_test_rmse'].shape == (n_iter,)
-    assert rs.cv_results['split2_test_rmse'].shape == (n_iter,)
-    assert rs.cv_results['mean_test_rmse'].shape == (n_iter,)
-    assert np.allclose(rs.cv_results['mean_test_rmse'],
-                       np.mean([rs.cv_results['split0_test_rmse'],
-                                rs.cv_results['split1_test_rmse'],
-                                rs.cv_results['split2_test_rmse']], axis=0))
-    assert np.allclose(rs.cv_results['std_test_rmse'],
-                       np.std([rs.cv_results['split0_test_rmse'],
-                               rs.cv_results['split1_test_rmse'],
-                               rs.cv_results['split2_test_rmse']], axis=0))
+    assert rs.cv_results['split0_test_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['split1_test_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['split2_test_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['mean_test_neg_rmse'].shape == (n_iter,)
+    assert np.allclose(rs.cv_results['mean_test_neg_rmse'],
+                       np.mean([rs.cv_results['split0_test_neg_rmse'],
+                                rs.cv_results['split1_test_neg_rmse'],
+                                rs.cv_results['split2_test_neg_rmse']], axis=0))
+    assert np.allclose(rs.cv_results['std_test_neg_rmse'],
+                       np.std([rs.cv_results['split0_test_neg_rmse'],
+                               rs.cv_results['split1_test_neg_rmse'],
+                               rs.cv_results['split2_test_neg_rmse']], axis=0))
 
     # test keys split*_train_mae, mean and std dev.
-    assert rs.cv_results['split0_train_rmse'].shape == (n_iter,)
-    assert rs.cv_results['split1_train_rmse'].shape == (n_iter,)
-    assert rs.cv_results['split2_train_rmse'].shape == (n_iter,)
-    assert rs.cv_results['mean_train_rmse'].shape == (n_iter,)
-    assert np.allclose(rs.cv_results['mean_train_rmse'],
-                       np.mean([rs.cv_results['split0_train_rmse'],
-                                rs.cv_results['split1_train_rmse'],
-                                rs.cv_results['split2_train_rmse']], axis=0))
-    assert np.allclose(rs.cv_results['std_train_rmse'],
-                       np.std([rs.cv_results['split0_train_rmse'],
-                               rs.cv_results['split1_train_rmse'],
-                               rs.cv_results['split2_train_rmse']], axis=0))
+    assert rs.cv_results['split0_train_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['split1_train_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['split2_train_neg_rmse'].shape == (n_iter,)
+    assert rs.cv_results['mean_train_neg_rmse'].shape == (n_iter,)
+    assert np.allclose(rs.cv_results['mean_train_neg_rmse'],
+                       np.mean([rs.cv_results['split0_train_neg_rmse'],
+                                rs.cv_results['split1_train_neg_rmse'],
+                                rs.cv_results['split2_train_neg_rmse']], axis=0))
+    assert np.allclose(rs.cv_results['std_train_neg_rmse'],
+                       np.std([rs.cv_results['split0_train_neg_rmse'],
+                               rs.cv_results['split1_train_neg_rmse'],
+                               rs.cv_results['split2_train_neg_rmse']], axis=0))
 
     # test fit and train times dimensions.
     assert rs.cv_results['mean_fit_time'].shape == (n_iter,)
@@ -342,10 +339,10 @@ def test_randomizedsearchcv_cv_results():
 
     # assert that best parameter in rs.cv_results['rank_test_measure'] is
     # indeed the best_param attribute.
-    best_index = np.argmin(rs.cv_results['rank_test_rmse'])
-    assert rs.cv_results['params'][best_index] == rs.best_params['rmse']
-    best_index = np.argmin(rs.cv_results['rank_test_mae'])
-    assert rs.cv_results['params'][best_index] == rs.best_params['mae']
+    best_index = np.argmin(rs.cv_results['rank_test_neg_rmse'])
+    assert rs.cv_results['params'][best_index] == rs.best_params['neg_rmse']
+    best_index = np.argmin(rs.cv_results['rank_test_neg_mae'])
+    assert rs.cv_results['params'][best_index] == rs.best_params['neg_mae']
 
 
 def test_randomizedsearchcv_refit():
@@ -359,27 +356,20 @@ def test_randomizedsearchcv_refit():
 
     # assert rs.fit() and rs.test will use best estimator for mae (first
     # appearing in measures)
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['mae', 'rmse'],
+    rs = RandomizedSearchCV(SVD, param_distributions,
+                            measures=[['neg_rmse', neg_rmse],
+                                      ['neg_mae', neg_mae]],
                             cv=2, refit=True)
     rs.fit(data)
     rs_preds = rs.test(data.construct_testset(data.raw_ratings))
-    mae_preds = rs.best_estimator['mae'].test(
+    neg_rmse = rs.best_estimator['neg_rmse'].test(
         data.construct_testset(data.raw_ratings))
-    assert rs_preds == mae_preds
-
-    # assert rs.fit() and rs.test will use best estimator for rmse
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['mae', 'rmse'],
-                            cv=2, refit='rmse')
-    rs.fit(data)
-    rs_preds = rs.test(data.construct_testset(data.raw_ratings))
-    rmse_preds = rs.best_estimator['rmse'].test(
-        data.construct_testset(data.raw_ratings))
-    assert rs_preds == rmse_preds
-    # test that predict() can be called
-    rs.predict(2, 4)
+    assert rs_preds == neg_rmse
 
     # assert test() and predict() cannot be used when refit is false
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['mae', 'rmse'],
+    rs = RandomizedSearchCV(SVD, param_distributions,
+                            measures=[['neg_rmse', neg_rmse],
+                                      ['neg_mae', neg_mae]],
                             cv=2, refit=False)
     rs.fit(data)
     with pytest.raises(ValueError):
@@ -392,7 +382,9 @@ def test_randomizedsearchcv_refit():
     test_file = os.path.join(os.path.dirname(__file__), './u1_ml100k_test')
     data = Dataset.load_from_folds([(train_file, test_file)],
                                    Reader('ml-100k'))
-    rs = RandomizedSearchCV(SVD, param_distributions, measures=['mae', 'rmse'],
+    rs = RandomizedSearchCV(SVD, param_distributions,
+                            measures=[['neg_rmse', neg_rmse],
+                                      ['neg_mae', neg_mae]],
                             cv=2, refit=True)
     with pytest.raises(ValueError):
         rs.fit(data)

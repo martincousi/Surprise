@@ -280,7 +280,7 @@ class Trainset:
 
         anti_testset = []
         for u in self.all_users():
-            user_items = set([j for (j, _) in self.ur[u]])
+            user_items = set([j for (j, _, _) in self.ur[u]])
             anti_testset += [(self.to_raw_uid(u),
                               self.to_raw_iid(i),
                               self.u_features.get(u, []),
