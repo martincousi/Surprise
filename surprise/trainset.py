@@ -50,6 +50,7 @@ class Trainset:
         rating_scale(tuple): The minimum and maximal rating of the rating
             scale.
         global_mean: The mean of all ratings :math:`\\mu`.
+        weighted_global_mean: The weighted mean of all ratings.
     """
 
     def __init__(self, ur, ir, u_features, i_features, sample_weight, n_users,
@@ -74,6 +75,7 @@ class Trainset:
         self._raw2inner_id_users = raw2inner_id_users
         self._raw2inner_id_items = raw2inner_id_items
         self._global_mean = None
+        self._weighted_global_mean = None
         # inner2raw dicts could be built right now (or even before) but they
         # are not always useful so we wait until we need them.
         self._inner2raw_id_users = None
@@ -276,7 +278,14 @@ class Trainset:
         Returns:
             A list of tuples ``(uid, iid, fill)`` where ids are raw ids.
         """
-        fill = self.global_mean if fill is None else float(fill)
+
+        if fill is None:
+            if self.sample_weight:
+                fill = self.weighted_global_mean
+            else:
+                fill = self.global_mean
+        else:
+            fill = float(fill)
 
         anti_testset = []
         for u in self.all_users():
@@ -308,18 +317,30 @@ class Trainset:
 
     @property
     def global_mean(self):
-        """Return the (offsetted) mean of all ratings. It is weighted if
-        `sample_weight` is provided.
+        """Return the (offsetted) mean of all ratings.
 
         It's only computed once.
         """
 
-        if self.sample_weight:
-            r, w = zip(*[(r, w) for (_, _, r, w) in
-                         self.all_ratings(sample_weight=True)])
-            self._global_mean = np.average(r, weights=w)
-        else:
-            self._global_mean = np.mean([r for (_, _, r) in
+        self._global_mean = np.mean([r for (_, _, r) in
                                         self.all_ratings()])
 
         return self._global_mean
+
+    @property
+    def weighted_global_mean(self):
+        """Return the weighted (offsetted) mean of all ratings. It is
+        only computable if `sample_weight` is provided.
+
+        It's only computed once.
+        """
+
+        if not self.sample_weight:
+            raise ValueError('weighted_global_mean is only available when'
+                             'sample_weight is provided.')
+
+        r, w = zip(*[(r, w) for (_, _, r, w) in
+                     self.all_ratings(sample_weight=True)])
+        self._weighted_global_mean = np.average(r, weights=w)
+
+        return self._weighted_global_mean
