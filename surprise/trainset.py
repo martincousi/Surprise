@@ -308,12 +308,18 @@ class Trainset:
 
     @property
     def global_mean(self):
-        """Return the (offsetted) mean of all ratings.
+        """Return the (offsetted) mean of all ratings. It is weighted if
+        `sample_weight` is provided.
 
         It's only computed once.
         """
 
-        self._global_mean = np.mean([r for (_, _, r) in
-                                     self.all_ratings()])
+        if self.sample_weight:
+            r, w = zip(*[(r, w) for (_, _, r, w) in
+                         self.all_ratings(sample_weight=True)])
+            self._global_mean = np.average(r, weights=w)
+        else:
+            self._global_mean = np.mean([r for (_, _, r) in
+                                        self.all_ratings()])
 
         return self._global_mean
