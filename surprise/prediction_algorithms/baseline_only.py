@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 from .algo_base import AlgoBase
+from .predictions import PredictionImpossible
 
 
 class BaselineOnly(AlgoBase):
@@ -42,10 +43,16 @@ class BaselineOnly(AlgoBase):
 
     def estimate(self, u, i, *_):
 
+        knows_user = self.trainset.knows_user(u)
+        knows_item = self.trainset.knows_item(i)
+
+        if not (knows_user or knows_item):
+            raise PredictionImpossible('Unknown user and item.')
+
         est = self.trainset.global_mean
-        if self.trainset.knows_user(u):
+        if knows_user:
             est += self.bu[u]
-        if self.trainset.knows_item(i):
+        if knows_item:
             est += self.bi[i]
 
         return est

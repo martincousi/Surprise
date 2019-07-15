@@ -102,10 +102,11 @@ class KNNBasic(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
-        warnings.warn('KNNBasic() currently does not use sample_weight',
-                      UserWarning)
-
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn('KNNBasic() currently does not use sample_weight',
+                          UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.sim = self.compute_similarities()
@@ -188,10 +189,14 @@ class KNNWithMeans(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
-        warnings.warn('KNNWithMeans() currently does not use sample_weight',
-                      UserWarning)
+
 
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn(
+                'KNNWithMeans() currently does not use sample_weight',
+                UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.sim = self.compute_similarities()
@@ -295,10 +300,11 @@ class KNNBaseline(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
-        warnings.warn('KNNBaseline() currently does not use sample_weight',
-                      UserWarning)
-
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn('KNNBaseline() currently does not use sample_weight',
+                          UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.bu, self.bi = self.compute_baselines()
@@ -394,10 +400,12 @@ class KNNWithZScore(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
-        warnings.warn('KNNWithZScore() currently does not use sample_weight',
-                      UserWarning)
-
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn(
+                'KNNWithZScore() currently does not use sample_weight',
+                UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
 

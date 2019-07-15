@@ -270,6 +270,9 @@ class SVD(AlgoBase):
         known_user = self.trainset.knows_user(u)
         known_item = self.trainset.knows_item(i)
 
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         if self.biased:
             est = self.trainset.global_mean
 
@@ -286,7 +289,7 @@ class SVD(AlgoBase):
             if known_user and known_item:
                 est = np.dot(self.qi[i], self.pu[u])
             else:
-                raise PredictionImpossible('User and item are unknown.')
+                raise PredictionImpossible('User or item are unknown.')
 
         return est
 
@@ -508,15 +511,21 @@ class SVDpp(AlgoBase):
 
     def estimate(self, u, i, *_):
 
+        known_user = self.trainset.knows_user(u)
+        known_item = self.trainset.knows_item(i)
+
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         est = self.trainset.global_mean
 
-        if self.trainset.knows_user(u):
+        if known_user:
             est += self.bu[u]
 
-        if self.trainset.knows_item(i):
+        if known_item:
             est += self.bi[i]
 
-        if self.trainset.knows_user(u) and self.trainset.knows_item(i):
+        if known_user and known_item:
             Iu = len(self.trainset.ur[u])  # nb of items rated by u
             u_impl_feedback = (sum(self.yj[j] for (j, _, _) in
                                    self.trainset.ur[u]) / np.sqrt(Iu))
@@ -760,6 +769,9 @@ class NMF(AlgoBase):
         known_user = self.trainset.knows_user(u)
         known_item = self.trainset.knows_item(i)
 
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         if self.biased:
             est = self.trainset.global_mean
 
@@ -776,6 +788,6 @@ class NMF(AlgoBase):
             if known_user and known_item:
                 est = np.dot(self.qi[i], self.pu[u])
             else:
-                raise PredictionImpossible('User and item are unknown.')
+                raise PredictionImpossible('User or item are unknown.')
 
         return est

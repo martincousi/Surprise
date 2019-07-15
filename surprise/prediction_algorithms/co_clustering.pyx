@@ -9,6 +9,7 @@ cimport numpy as np  # noqa
 import numpy as np
 
 from .algo_base import AlgoBase
+from .predictions import PredictionImpossible
 from ..utils import get_rng
 
 
@@ -247,7 +248,7 @@ class CoClustering(AlgoBase):
     def estimate(self, u, i, *_):
 
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
-            return self.trainset.global_mean
+            raise PredictionImpossible('Unknown user and item')
 
         if not self.trainset.knows_user(u):
             return self.cltr_i[i]

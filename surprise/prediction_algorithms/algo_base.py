@@ -187,14 +187,19 @@ class AlgoBase(object):
         '''Used when the ``PredictionImpossible`` exception is raised during a
         call to :meth:`predict()
         <surprise.prediction_algorithms.algo_base.AlgoBase.predict>`. By
-        default, return the global mean of all ratings (can be overridden in
-        child classes).
+        default, return the global (weighted) mean of all ratings (can be
+        overridden in child classes).
 
         Returns:
-            (float): The mean of all ratings in the trainset.
+            (float): The (weighted) mean of all ratings in the trainset.
         '''
 
-        return self.trainset.global_mean
+        if self.trainset.sample_weight:
+            est = self.trainset.weighted_global_mean
+        else:
+            est = self.trainset.global_mean
+
+        return est
 
     def test(self, testset, verbose=False):
         """Test the algorithm on given testset, i.e. estimate all the ratings
