@@ -35,24 +35,6 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         self.pre_dispatch = pre_dispatch
         self.joblib_verbose = joblib_verbose
 
-    def _parse_options(self, params):
-        # As sim_options and bsl_options are dictionaries, they require a
-        # special treatment.
-
-        if 'sim_options' in params:
-            sim_options = params['sim_options']
-            sim_options_list = [dict(zip(sim_options, v)) for v in
-                                product(*sim_options.values())]
-            params['sim_options'] = sim_options_list
-
-        if 'bsl_options' in params:
-            bsl_options = params['bsl_options']
-            bsl_options_list = [dict(zip(bsl_options, v)) for v in
-                                product(*bsl_options.values())]
-            params['bsl_options'] = bsl_options_list
-
-        return params
-
     def fit(self, data):
         """Runs the ``fit()`` method of the algorithm for all parameter
         combinations, over different splits given by the ``cv`` parameter.
@@ -298,6 +280,25 @@ class GridSearchCV(BaseSearchCV):
         self.param_combinations = [dict(zip(self.param_grid, v)) for v in
                                    product(*self.param_grid.values())]
 
+    def _parse_options(self, params):
+        """ As sim_options and bsl_options are dictionaries, they require a
+        special treatment.
+        """
+
+        if 'sim_options' in params:
+            sim_options = params['sim_options']
+            sim_options_list = [dict(zip(sim_options, v)) for v in
+                                product(*sim_options.values())]
+            params['sim_options'] = sim_options_list
+
+        if 'bsl_options' in params:
+            bsl_options = params['bsl_options']
+            bsl_options_list = [dict(zip(bsl_options, v)) for v in
+                                product(*bsl_options.values())]
+            params['bsl_options'] = bsl_options_list
+
+        return params
+
 
 class RandomizedSearchCV(BaseSearchCV):
     """The :class:`RandomizedSearchCV` class computes accuracy metrics for an
@@ -419,6 +420,18 @@ class RandomizedSearchCV(BaseSearchCV):
             param_distributions.copy())
         self.param_combinations = self._sample_parameters(
             self.param_distributions, self.n_iter, self.random_state)
+
+    def _parse_options(self, params):
+        """ As sim_options and bsl_options are dictionaries, they require a
+        special treatment.
+        """
+
+        for option in ['sim_options', 'bsl_options']:
+            if option in params:
+                params[option] = self._sample_parameters(
+                    params[option].copy(), self.n_iter, self.random_state)
+
+        return params
 
     @staticmethod
     def _sample_parameters(param_distributions, n_iter, random_state=None):
