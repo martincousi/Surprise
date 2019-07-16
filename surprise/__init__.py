@@ -3,6 +3,7 @@ from pkg_resources import get_distribution
 from .prediction_algorithms import AlgoBase
 from .prediction_algorithms import NormalPredictor
 from .prediction_algorithms import BaselineOnly
+from .prediction_algorithms import GlobalOnly
 from .prediction_algorithms import KNNBasic
 from .prediction_algorithms import KNNWithMeans
 from .prediction_algorithms import KNNWithZScore
@@ -26,10 +27,10 @@ from .builtin_datasets import get_dataset_dir
 from . import model_selection
 from . import dump
 
-__all__ = ['AlgoBase', 'NormalPredictor', 'BaselineOnly', 'KNNBasic',
-           'KNNWithMeans', 'KNNBaseline', 'SVD', 'SVDpp', 'NMF', 'SlopeOne',
-           'CoClustering', 'PredictionImpossible', 'Prediction', 'Dataset',
-           'Reader', 'Trainset', 'dump', 'KNNWithZScore', 'get_dataset_dir',
-           'model_selection', 'Lasso', 'FM', 'FFM']
+__all__ = ['AlgoBase', 'NormalPredictor', 'BaselineOnly', 'GlobalOnly',
+           'KNNBasic', 'KNNWithMeans', 'KNNBaseline', 'SVD', 'SVDpp', 'NMF',
+           'SlopeOne', 'CoClustering', 'PredictionImpossible', 'Prediction',
+           'Dataset', 'Reader', 'Trainset', 'dump', 'KNNWithZScore',
+           'get_dataset_dir', 'model_selection', 'Lasso', 'FM', 'FFM']
 
 __version__ = get_distribution('scikit-surprise').version

@@ -47,12 +47,12 @@ def neg_rmse(predictions, verbose=False):
 
     mse = np.mean([float((true_r - est)**2)
                    for (_, _, true_r, est, _) in predictions])
-    rmse_ = np.sqrt(mse)
+    neg_rmse_ = -np.sqrt(mse)
 
     if verbose:
-        print('RMSE: {0:1.4f}'.format(rmse_))
+        print('Negative RMSE: {0:1.4f}'.format(neg_rmse_))
 
-    return -rmse_
+    return neg_rmse_
 
 
 def neg_mae(predictions, verbose=False):
@@ -80,13 +80,13 @@ def neg_mae(predictions, verbose=False):
     if not predictions:
         raise ValueError('Prediction list is empty.')
 
-    mae_ = np.mean([float(abs(true_r - est))
+    neg_mae_ = - np.mean([float(abs(true_r - est))
                     for (_, _, true_r, est, _) in predictions])
 
     if verbose:
-        print('MAE:  {0:1.4f}'.format(mae_))
+        print('Negative MAE:  {0:1.4f}'.format(neg_mae_))
 
-    return -mae_
+    return neg_mae_
 
 
 def fcp(predictions, verbose=False):
