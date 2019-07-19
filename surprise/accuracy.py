@@ -19,6 +19,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from collections import defaultdict
 import math
+import warnings
 
 import numpy as np
 from six import iteritems
@@ -140,7 +141,7 @@ def fcp(predictions, verbose=False):
                          'Does some users have at least two predictions?')
 
     if verbose:
-        print('FCP:  {0:1.4f}'.format(fcp))
+        print('FCP:  {0:1.4f}'.format(fcp_))
 
     return fcp_
 
@@ -251,10 +252,14 @@ def f1(predictions, threshold, reverse=True, verbose=False):
     fp = np.sum(~true_targets & est_targets)
     fn = np.sum(true_targets & ~est_targets)
 
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-
-    f1_ = 2 * precision * recall / (precision + recall)
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error')
+        try:
+            precision = tp / (tp + fp)
+            recall = tp / (tp + fn)
+            f1_ = 2 * precision * recall / (precision + recall)
+        except RuntimeWarning:
+            f1_ = np.nan
 
     if verbose:
         print('F1:  {0:1.4f}'.format(f1_))
