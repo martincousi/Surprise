@@ -252,14 +252,12 @@ def f1(predictions, threshold, reverse=True, verbose=False):
     fp = np.sum(~true_targets & est_targets)
     fn = np.sum(true_targets & ~est_targets)
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings('error')
-        try:
-            precision = tp / (tp + fp)
-            recall = tp / (tp + fn)
-            f1_ = 2 * precision * recall / (precision + recall)
-        except RuntimeWarning:
-            f1_ = np.nan
+    if tp == 0:
+        f1_ = 0.  # as for sklearn.metrics.f1_score
+    else:
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        f1_ = 2 * precision * recall / (precision + recall)
 
     if verbose:
         print('F1:  {0:1.4f}'.format(f1_))
