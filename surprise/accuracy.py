@@ -134,11 +134,10 @@ def fcp(predictions, verbose=False):
     nc = sum(nc_u.values())
     nd = sum(nd_u.values())
 
-    try:
+    if nc + nd == 0:  # no pairs with different ratings
+        fcp_ = 0.
+    else:
         fcp_ = nc / (nc + nd)
-    except ZeroDivisionError:
-        raise ValueError('cannot compute fcp on this list of prediction. '
-                         'Does some users have at least two predictions?')
 
     if verbose:
         print('FCP:  {0:1.4f}'.format(fcp_))
