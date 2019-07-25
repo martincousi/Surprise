@@ -78,8 +78,12 @@ class KFold():
     def __init__(self, n_splits=5, random_state=None, shuffle=True):
 
         self.n_splits = n_splits
-        self.shuffle = shuffle
         self.random_state = random_state
+        self.shuffle = shuffle
+
+    def __repr__(self):
+        return ('KFold(n_splits=%r, random_state=%r, shuffle=%r)' %
+                (self.n_splits, self.random_state, self.shuffle))
 
     def split(self, data):
         '''Generator function to iterate over trainsets and testsets.
