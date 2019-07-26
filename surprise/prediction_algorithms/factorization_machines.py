@@ -5,6 +5,7 @@ the :mod:`knns` module includes some k-NN inspired algorithms.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import copy
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -12,7 +13,7 @@ from sklearn.model_selection import train_test_split
 import torch
 from torch import nn
 
-# from .predictions import PredictionImpossible
+from .predictions import PredictionImpossible
 from .algo_base import AlgoBase
 
 
@@ -77,10 +78,10 @@ class FM(AlgoBase):
     """A factorization machine algorithm implemented using pytorch.
 
     Args:
-        rating_lst : list of str or `None`, default : ['userID', 'itemID']
+        rating_lst : list of str or `None`, default : ('userID', 'itemID')
             This list specifies what information from the `raw_ratings` to put
             in the `x` vector. Accepted list values are 'userID', 'itemID',
-            'imp_u_rating', 'exp_u_rating', 'imp_u_rating' and 'exp_u_rating'.
+            'imp_u_rating', 'exp_u_rating', 'imp_i_rating' and 'exp_i_rating'.
             Implicit and explicit user/item rating values are scaled by the
             number of values. If `None`, no info is added.
         user_lst : list of str or `None`, default : `None`
