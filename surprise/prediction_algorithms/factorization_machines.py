@@ -1,5 +1,5 @@
 """
-the :mod:`knns` module includes some k-NN inspired algorithms.
+the :mod:`fm` module includes a factorization machine algorithm.
 """
 
 from __future__ import (absolute_import, division, print_function,
