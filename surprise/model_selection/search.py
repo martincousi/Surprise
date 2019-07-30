@@ -483,7 +483,10 @@ class RandomizedSearchCV(BaseSearchCV):
             # create exhaustive combinations
             param_grid = [dict(zip(param_distributions, v)) for v in
                           product(*param_distributions.values())]
-            combos = np.random.choice(param_grid, n_iter, replace=False)
+            if len(param_grid) > n_iter:
+                combos = np.random.choice(param_grid, n_iter, replace=False)
+            else:
+                combos = param_grid
         else:
             combos = []
             for _ in moves.range(n_iter):
