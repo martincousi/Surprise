@@ -92,6 +92,43 @@ def neg_mae(predictions, verbose=False):
     return neg_mae_
 
 
+def neg_bce(predictions, verbose=False):
+    """Compute the negative BCE (binary cross-entropy).
+
+    Args:
+        predictions (:obj:`list` of :obj:`Prediction\
+            <surprise.prediction_algorithms.predictions.Prediction>`):
+            A list of predictions, as returned by the :meth:`test()
+            <surprise.prediction_algorithms.algo_base.AlgoBase.test>` method.
+        verbose: If True, will print computed value. Default is ``True``.
+
+    Returns:
+        The negative binary cross-entropy of predictions.
+
+    Raises:
+        ValueError: When ``predictions`` is empty.
+        ValueError: When true ratings are not binary.
+    """
+
+    if not predictions:
+        raise ValueError('Prediction list is empty.')
+
+    neg_bce_ = 0.
+    for _, _, true_r, est, _ in predictions:
+        if true_r == 0.:
+            neg_bce_ -= math.log(1. - est)
+        elif true_r == 1.:
+            neg_bce_ -= math.log(est)
+        else:
+            raise ValueError('True ratings are not binary.')
+    neg_bce_ /= -len(predictions)
+
+    if verbose:
+        print('Negative BCE:  {0:1.4f}'.format(neg_bce_))
+
+    return neg_bce_
+
+
 def fcp(predictions, verbose=False):
     """Compute FCP (Fraction of Concordant Pairs).
 
@@ -145,20 +182,8 @@ def fcp(predictions, verbose=False):
     return fcp_
 
 
-def _dcg(ranked_preds, relevance):
-    """ Inner function that computes DCG for one user.
-    """
-
-    u_dcg = 0
-    for v, pred in enumerate(ranked_preds, 1):
-        rel = relevance(pred)
-        u_dcg += ((2 ** rel) - 1) / math.log2(v + 1)
-
-    return u_dcg
-
-
 def ndcg(predictions, relevance=None, reverse=True, verbose=False):
-    """ Compute NDCG (Normalized Discounted Cumulative Gain).
+    """ Compute tie-aware NDCG (Normalized Discounted Cumulative Gain).
 
     Args:
         predictions (:obj:`list` of :obj:`Prediction\
@@ -189,20 +214,49 @@ def ndcg(predictions, relevance=None, reverse=True, verbose=False):
     if relevance is None:
         relevance = default_relevance
 
+    def gain(rel):
+        return (2 ** rel) - 1
+
+    def discount(gain, rank):
+        return gain / math.log2(rank + 2.)
+
     predictions_u = defaultdict(list)
     for pred in predictions:
         predictions_u[pred.uid].append(pred)
 
-    ndcg_ = 0
+    ndcg_ = 0.
     for uid, preds in iteritems(predictions_u):
-        # decreasing order of estimated rating, unless non-default reverse
-        est_ranks = sorted(preds, key=lambda pred: pred.est, reverse=reverse)
+        # Compute ideal DCG
+        idcg_u = 0.
         # decreasing order of relevance
         true_ranks = sorted(preds, key=lambda pred: relevance(pred),
                             reverse=True)
-        dcg_u = _dcg(est_ranks, relevance)
-        idcg_u = _dcg(true_ranks, relevance)
-        ndcg_ += dcg_u / idcg_u if idcg_u != 0 else 0
+        for i, pred in enumerate(true_ranks):
+            idcg_u += discount(gain(relevance(pred)), i)
+        if idcg_u == 0.:
+            continue
+
+        # Compute DCG
+        dcg_u = 0.
+        # decreasing order of estimated rating, unless non-default reverse
+        est_ranks = sorted(preds, key=lambda pred: pred.est,
+                           reverse=reverse)
+        a = 0
+        while a < len(est_ranks):
+            b = a + 1
+            while ((b < len(est_ranks)) and
+                    (est_ranks[a].est == est_ranks[b].est)):
+                b = b + 1
+            avg_gain = 0.
+            for pred in est_ranks[a:b]:
+                avg_gain += gain(relevance(pred))
+            avg_gain /= (b - a)
+            for i in range(a, b):
+                dcg_u += discount(avg_gain, i)
+            a = b
+            
+        # Compute NDCG
+        ndcg_ += dcg_u / idcg_u
 
     ndcg_ /= len(predictions_u)
 
