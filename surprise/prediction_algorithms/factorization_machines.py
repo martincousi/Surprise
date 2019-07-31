@@ -29,33 +29,42 @@ class FMtorchNN(nn.Module):
         init_std: float, default: 0.01
             The standard deviation of the normal distribution for
             initialization.
+        binary: bool, default: False
+            Whether the output is binary.
     """
 
-    def __init__(self, n_features, n_factors=20, init_std=0.01):
+    def __init__(self, n_features, n_factors=20, init_std=0.01, binary=False):
+
         super(FMtorchNN, self).__init__()
         self.n_features = n_features
         self.n_factors = n_factors
         self.init_std = init_std
+        self.binary = binary
 
-        # Initialize bias term
+        # Define parameters
         self.b = nn.Parameter(torch.Tensor(1),
                               requires_grad=True)
-        self.b.data.fill_(0.)
-        # self.b.data.normal_(init_mean, init_std)
-        # self.b.data.uniform_(-0.01, 0.01)
-
-        # Initialize linear terms
         self.w = nn.Parameter(torch.Tensor(self.n_features, 1),
                               requires_grad=True)
-        self.w.data.fill_(0.)
-        # self.w.data.normal_(init_mean, init_std)
-        # self.w.data.uniform_(-0.01, 0.01)
-
-        # Initialize interaction terms
         self.V = nn.Parameter(torch.Tensor(self.n_features, self.n_factors),
                               requires_grad=True)
+
+        # Initialize parameters
+        self.initialize()
+
+        # Define activation if necessary
+        if self.binary:
+            self.out_act = nn.Sigmoid()
+
+    def initialize(self):
+
+        self.b.data.fill_(0.)
+        self.w.data.fill_(0.)
         self.V.data.normal_(0., self.init_std)
-        # self.V.data.uniform_(-0.01, 0.01)
+        # nn.init.xavier_uniform_(self.w.data)
+        # nn.init.xavier_uniform_(self.V.data)
+        # nn.init.xavier_normal_(self.w.data)
+        # nn.init.xavier_normal_(self.V.data)
 
     def forward(self, x):
 
@@ -70,8 +79,50 @@ class FMtorchNN(nn.Module):
 
         # Compute predictions
         y_pred = self.b + total_linear + total_inter
+        if self.binary:
+            y_pred = self.out_act(y_pred)
 
         return y_pred
+
+
+class MyCriterion(nn.Module):
+    """ The PyTorch model for the loss function. This class is used by
+    `FM`.
+
+    Args:
+        sample_weight: Tensor or None, default: None
+            Weights to use in loss. 
+        binary: bool, default: False
+            Whether the output is binary.
+    """
+
+    def __init__(self, sample_weight=None, binary=False):
+
+        super().__init__()
+
+        self.sample_weight = sample_weight
+        self.binary = binary
+
+        if self.binary:
+            if self.sample_weight is not None:
+                self.loss_fn = nn.BCELoss(reduction='none')
+            else:
+                self.loss_fn = nn.BCELoss()
+        else:
+            if self.sample_weight is not None:
+                self.loss_fn = nn.MSELoss(reduction='none')
+            else:
+                self.loss_fn = nn.MSELoss()
+
+    def forward(self, y_pred, y):
+
+        loss = self.loss_fn(y_pred, y)
+
+        if self.sample_weight is not None:
+            loss = (torch.dot(self.sample_weight, loss) /
+                    torch.sum(self.sample_weight))
+
+        return loss
 
 
 class FM(AlgoBase):
