@@ -145,79 +145,100 @@ class FM(AlgoBase):
             features. If `None`, no info is added.
         n_factors : int, default: 20
             Number of latent factors in low-rank appoximation.
-        n_epochs : int, default : 30
-            Number of epochs. All epochs are ran but only the best model out of
-            all epochs is kept.
         dev_ratio : float, default : 0.3
             Ratio of `trainset` to dedicate to development data set to identify
             best model. Should be either positive and smaller than the number
             of samples or a float in the (0, 1) range.
-        init_std: float, default : 0.01
+        patience : int, default : 10
+            Number of epochs without improvement to wait before ending
+            training. The last best model is kept.
+        n_epochs : int, default : 500
+            Maximum number of training epochs.
+        init_std : float, default : 0.01
             The standard deviation of the normal distribution for
             initialization.
-        lr : float, default: 0.001
+        lr : float, default : 0.001
             Learning rate for optimization method.
-        reg : float, default: 0.02
+        reg : float, default : 0.02
             Strength of L2 regularization. It can be disabled by setting it to
             zero.
-        random_state : int, default: `None`
+        refit : bool, default : True
+            Determines whether to refit model with all training data for the
+            best number of epochs found with the development data set.
+        binary : bool, default : False
+            Whether to use a sigmoid on the output to obtain a binary output.
+        random_state : int, default : `None`
             Determines the RNG that will be used for initialization. If
             int, ``random_state`` will be used as a seed for a new RNG. This is
             useful to get the same initialization over multiple calls to
             ``fit()``. If ``None``, the current RNG from torch is used.
-        verbose : int, default: False
+        verbose : bool, default : False
             Level of verbosity.
     """
 
-    def __init__(self, rating_lst=['userID', 'itemID'], user_lst=None,
-                 item_lst=None, n_factors=20, n_epochs=30, dev_ratio=0.3,
-                 init_std=0.01, lr=0.001, reg=0.02, random_state=None,
-                 verbose=False, **kwargs):
+    def __init__(self, rating_lst=('userID', 'itemID'), user_lst=None,
+                 item_lst=None, n_factors=20, dev_ratio=0.3, patience=10,
+                 n_epochs=500, init_std=0.01, lr=0.001, reg=0.02, refit=True,
+                 binary=False, random_state=None, verbose=False, **kwargs):
+
+        if rating_lst is None:
+            rating_lst = []
+        if user_lst is None:
+            user_lst = []
+        if item_lst is None:
+            item_lst = []
 
         AlgoBase.__init__(self, **kwargs)
+
         self.rating_lst = rating_lst
         self.user_lst = user_lst
         self.item_lst = item_lst
         self.n_factors = n_factors
-        self.n_epochs = n_epochs
         self.dev_ratio = dev_ratio
+        self.patience = patience
+        self.n_epochs = n_epochs
         self.init_std = init_std
         self.lr = lr
         self.reg = reg
+        self.refit = refit
+        self.binary = binary
         self.random_state = random_state
         self.verbose = verbose
 
-        torch.set_default_dtype(torch.float64)  # use float64
+        self.model = None
+
 
     def fit(self, trainset):
+
+        torch.set_default_dtype(torch.float64)  # use float64
 
         AlgoBase.fit(self, trainset)
 
         # Construct data and initialize model
         # Initialization needs to be done in fit() since it depends on the
         # trainset
-        if self.random_state:
+        if self.random_state is not None:
             np.random.seed(self.random_state)
             torch.manual_seed(self.random_state)
         self._construct_FM_data()
-        self.model = FMtorchNN(self.n_features, self.n_factors, self.init_std)
+        self.model = FMtorchNN(self.n_features, n_factors=self.n_factors,
+                               init_std=self.init_std, binary=self.binary)
         params = FM._add_weight_decay(self.model, self.reg)
         self.optimizer = torch.optim.Adam(params, lr=self.lr)
+        # self.optimizer = torch.optim.SGD(params, lr=self.lr)
 
         # Define data
         x = self.libsvm_df.iloc[:, 2:].values.astype('float64')
         y = self.libsvm_df.iloc[:, 0].values.astype('float64')
         if self.trainset.sample_weight:
             sample_weight = self.libsvm_df.iloc[:, 1].values.astype('float64')
-        else:
-            sample_weight = None
-        if sample_weight is not None:
             x_train, x_dev, y_train, y_dev, w_train, w_dev = train_test_split(
                 x, y, sample_weight, test_size=self.dev_ratio,
                 random_state=self.random_state)
             w_train = torch.Tensor(w_train)
             w_dev = torch.Tensor(w_dev)
         else:
+            sample_weight = None
             x_train, x_dev, y_train, y_dev = train_test_split(
                 x, y, test_size=self.dev_ratio, random_state=self.random_state)
             w_train = None
@@ -226,9 +247,15 @@ class FM(AlgoBase):
         y_train = torch.Tensor(y_train)
         x_dev = torch.Tensor(x_dev)
         y_dev = torch.Tensor(y_dev)
+        train_criterion = MyCriterion(sample_weight=w_train,
+                                      binary=self.binary)
+        dev_criterion = MyCriterion(sample_weight=w_dev,
+                                    binary=self.binary)
 
-        best_loss = np.inf
         best_model = None
+        best_loss = np.inf
+        best_epoch = None
+        counter = 0
         for epoch in range(self.n_epochs):
             # Switch to training mode, clear gradient accumulators
             self.model.train()
@@ -236,7 +263,7 @@ class FM(AlgoBase):
             # Forward pass
             y_pred = self.model(x_train)
             # Compute loss
-            self.train_loss = self._compute_loss(y_pred, y_train, w_train)
+            self.train_loss = train_criterion(y_pred, y_train)
             # Backward pass and update weights
             self.train_loss.backward()
             self.optimizer.step()
@@ -245,7 +272,7 @@ class FM(AlgoBase):
             # See https://github.com/pytorch/examples/blob/master/snli/train.py
             self.model.eval()
             y_pred = self.model(x_dev)
-            self.dev_loss = self._compute_loss(y_pred, y_dev, w_dev)
+            self.dev_loss = dev_criterion(y_pred, y_dev)
 
             if self.verbose:
                 print(epoch, self.train_loss.item(), self.dev_loss.item())
@@ -253,16 +280,66 @@ class FM(AlgoBase):
             if self.dev_loss.item() < best_loss:
                 best_model = copy.deepcopy(self.model)
                 best_loss = self.dev_loss.item()
+                best_epoch = epoch
+                counter = 0
                 if self.verbose:
                     print('A new best model have been found!')
 
-        self.model = best_model
+            counter += 1
+
+            if counter > self.patience:
+                break
+
+        if best_model is None:  # keep last model
+            best_model = copy.deepcopy(self.model)
+            best_loss = self.dev_loss.item()
+            best_epoch = epoch
+            
+        if self.refit:
+            if self.verbose:
+                print('Refitting model with all training data...')
+            self.model = FMtorchNN(self.n_features, n_factors=self.n_factors,
+                                   init_std=self.init_std, binary=self.binary)
+            params = FM._add_weight_decay(self.model, self.reg)
+            self.optimizer = torch.optim.Adam(params, lr=self.lr)
+            # self.optimizer = torch.optim.SGD(params, lr=self.lr)
+            x = torch.Tensor(x)
+            y = torch.Tensor(y)
+            if sample_weight is not None:
+                w = torch.Tensor(sample_weight)
+            else:
+                w = None
+            criterion = MyCriterion(sample_weight=w, binary=self.binary)
+            for i in range(best_epoch + 1):
+                self.model.train()
+                self.optimizer.zero_grad()
+                y_pred = self.model(x)
+                self.train_all_loss = criterion(y_pred, y)
+                self.train_all_loss.backward()
+                self.optimizer.step()
+        else:
+            self.model = best_model
+        
+        self.best_epoch = best_epoch
 
         return self
 
-    def _add_weight_decay(model, reg, skip_list=[]):
+    def print_model(self):
+        """ Print the fitted FM model.
+        """
+
+        if self.model is None:
+            print('fit() has not been called; no model to print.')
+
+        for name, param in self.model.named_parameters():
+            print(name, param.data)
+
+    def _add_weight_decay(model, reg, skip_list=None):
         """ Add weight_decay with no regularization for bias.
         """
+
+        if skip_list is None:
+            skip_list = []
 
         decay, no_decay = [], []
         for name, param in model.named_parameters():
@@ -276,21 +353,6 @@ class FM(AlgoBase):
 
         return [{'params': no_decay, 'weight_decay': 0.},
                 {'params': decay, 'weight_decay': reg}]
-
-    def _compute_loss(self, y_pred, y, sample_weight=None):
-        """ Computes a different loss depending on whether `sample_weights` are
-        defined.
-        """
-
-        if sample_weight is not None:
-            criterion = nn.MSELoss(reduction='none')
-            loss = criterion(y_pred, y)
-            loss = torch.dot(sample_weight, loss) / torch.sum(sample_weight)
-        else:
-            criterion = nn.MSELoss()
-            loss = criterion(y_pred, y)
-
-        return loss
 
     def _construct_FM_data(self):
         """ Construct the data needed by `FM`.
@@ -313,11 +375,16 @@ class FM(AlgoBase):
 
         # Construct ratings_df from trainset
         # The IDs are unique and start at 0
+        # These are the inner ids!
         ratings_df = pd.DataFrame([tup for tup in self.trainset.all_ratings()],
                                   columns=['userID', 'itemID', 'rating'])
 
         # Initialize df with rating values
         libsvm_df = pd.DataFrame(ratings_df['rating'])
+
+        # Remove offset if binary
+        if self.binary:
+            libsvm_df['rating'] -= self.trainset.offset
 
         # Add sample_weight column
         libsvm_df['sample_weight'] = ratings_df.apply(
@@ -430,10 +497,7 @@ class FM(AlgoBase):
 
     def estimate(self, u, i, u_features, i_features):
 
-        # Estimate rating
-        x = self._construct_estimate_input(u, i, u_features, i_features)
-        x = torch.Tensor(x[None, :])  # add dimension
-        est = float(self.model(x))
+        torch.set_default_dtype(torch.float64)  # use float64
 
         # Construct details
         details = {}
@@ -447,8 +511,16 @@ class FM(AlgoBase):
             details['knows_user'] = False
             details['knows_item'] = True
         else:
-            details['knows_user'] = False
-            details['knows_item'] = False
+            raise PredictionImpossible('Unknown user and item')
+
+        # Estimate rating
+        x = self._construct_estimate_input(u, i, u_features, i_features)
+        x = torch.Tensor(x[None, :])  # add dimension
+        est = float(self.model(x))
+
+        # Add offset if binary (since was trained without offset)
+        if self.binary:
+            est += self.trainset.offset
 
         return est, details
 
@@ -563,4 +635,4 @@ class FM(AlgoBase):
                     temp[idx] = temp_df[feature]
             x.extend(temp)
 
-        return np.array(x)
+        return np.array(x).astype('float64')
