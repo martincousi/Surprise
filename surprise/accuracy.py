@@ -19,6 +19,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from collections import defaultdict
 import math
+import sys
 import warnings
 
 import numpy as np
@@ -116,9 +117,15 @@ def neg_bce(predictions, verbose=False):
     neg_bce_ = 0.
     for _, _, true_r, est, _ in predictions:
         if true_r == 0.:
-            neg_bce_ -= math.log(1. - est)
+            if 1. - est > 0:
+                neg_bce_ -= math.log(1. - est)
+            else:
+                neg_bce_ -= math.log(sys.float_info.min)
         elif true_r == 1.:
-            neg_bce_ -= math.log(est)
+            if est > 0:
+                neg_bce_ -= math.log(est)
+            else:
+                neg_bce_ -= math.log(sys.float_info.min)
         else:
             raise ValueError('True ratings are not binary.')
     neg_bce_ /= -len(predictions)
