@@ -21,7 +21,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
     @abstractmethod
     def __init__(self, algo_class, measures=None, cv=None,
                  refit=False, return_train_measures=False, n_jobs=1,
-                 pre_dispatch='2*n_jobs', joblib_verbose=0):
+                 pre_dispatch='2*n_jobs', batch_size='auto', joblib_verbose=0):
 
         self.algo_class = algo_class
         if measures is None:
@@ -33,6 +33,7 @@ class BaseSearchCV(with_metaclass(ABCMeta)):
         self.return_train_measures = return_train_measures
         self.n_jobs = n_jobs
         self.pre_dispatch = pre_dispatch
+        self.batch_size = batch_size
         self.joblib_verbose = joblib_verbose
 
     def fit(self, data):
@@ -241,6 +242,14 @@ class GridSearchCV(BaseSearchCV):
                 as in ``'2*n_jobs'``.
 
             Default is ``'2*n_jobs'``.
+        batch_size(int or 'auto'): The number of atomic tasks to dispatch at
+            once to each worker. When individual evaluations are very fast,
+            dispatching calls to workers can be slower than sequential
+            computation because of the overhead. Batching fast computations
+            together can mitigate this. The 'auto' strategy keeps track of the
+            time it takes for a batch to complete, and dynamically adjusts the
+            batch size to keep the time on the order of half a second, using a
+            heuristic. The initial batch size is 1. Default is 'auto'.
         joblib_verbose(int): Controls the verbosity of joblib: the higher, the
             more messages.
 
@@ -269,12 +278,13 @@ class GridSearchCV(BaseSearchCV):
 
     def __init__(self, algo_class, param_grid, measures=None,
                  cv=None, refit=False, return_train_measures=False, n_jobs=1,
-                 pre_dispatch='2*n_jobs', joblib_verbose=0):
+                 pre_dispatch='2*n_jobs', batch_size='auto', joblib_verbose=0):
 
         super(GridSearchCV, self).__init__(
             algo_class=algo_class, measures=measures, cv=cv, refit=refit,
             return_train_measures=return_train_measures, n_jobs=n_jobs,
-            pre_dispatch=pre_dispatch, joblib_verbose=joblib_verbose)
+            pre_dispatch=pre_dispatch,
+            batch_size=batch_size, joblib_verbose=joblib_verbose)
 
         self.param_grid = self._parse_options(param_grid.copy())
         self.param_combinations = [dict(zip(self.param_grid, v)) for v in
@@ -371,6 +381,14 @@ class RandomizedSearchCV(BaseSearchCV):
                 as in ``'2*n_jobs'``.
 
             Default is ``'2*n_jobs'``.
+        batch_size(int or 'auto'): The number of atomic tasks to dispatch at
+            once to each worker. When individual evaluations are very fast,
+            dispatching calls to workers can be slower than sequential
+            computation because of the overhead. Batching fast computations
+            together can mitigate this. The 'auto' strategy keeps track of the
+            time it takes for a batch to complete, and dynamically adjusts the
+            batch size to keep the time on the order of half a second, using a
+            heuristic. The initial batch size is 1. Default is 'auto'.
         random_state(int, RandomState or None): Pseudo random number
             generator seed used for random uniform sampling from lists of
             possible values instead of scipy.stats distributions. If int,
@@ -407,12 +425,14 @@ class RandomizedSearchCV(BaseSearchCV):
     def __init__(self, algo_class, param_distributions, n_iter=10,
                  measures=None, cv=None, refit=False,
                  return_train_measures=False, n_jobs=1,
-                 pre_dispatch='2*n_jobs', random_state=None, joblib_verbose=0):
+                 pre_dispatch='2*n_jobs', batch_size='auto',
+                 random_state=None, joblib_verbose=0):
 
         super(RandomizedSearchCV, self).__init__(
             algo_class=algo_class, measures=measures, cv=cv, refit=refit,
             return_train_measures=return_train_measures, n_jobs=n_jobs,
-            pre_dispatch=pre_dispatch, joblib_verbose=joblib_verbose)
+            pre_dispatch=pre_dispatch, batch_size=batch_size,
+            joblib_verbose=joblib_verbose)
 
         self.n_iter = n_iter
         self.random_state = random_state
