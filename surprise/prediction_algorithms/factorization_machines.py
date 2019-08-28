@@ -5,6 +5,7 @@ the :mod:`fm` module includes a factorization machine algorithm.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import copy
+from collections import defaultdict
 import time
 import warnings
 
@@ -269,9 +270,10 @@ class FMMixin():
             train_data = CandidateDataset(x_train, y_train, w_train)
             train_loader = torch.utils.data.DataLoader(
                 train_data, batch_size=self.batch_size, shuffle=True)
-        else:
+        elif isinstance(self, FM):
             x_train = x_train.to_sparse()  # take advantage of x sparseness
-        x_dev = x_dev.to_sparse()  # take advantage of x sparseness
+        if isinstance(self, FM):
+            x_dev = x_dev.to_sparse()  # take advantage of x sparseness
 
         # Construct criterions
         train_criterion = MyCriterion(sample_weight=sample_weight,
@@ -336,7 +338,7 @@ class FMMixin():
                 train_data = CandidateDataset(x, y, w)
                 train_loader = torch.utils.data.DataLoader(
                     train_data, batch_size=self.batch_size, shuffle=True)
-            else:
+            elif isinstance(self, FM):
                 x = x.to_sparse()  # take advantage of x sparseness
             train_step = FMMixin.make_train_step(self.model,
                                                  train_criterion,
@@ -747,7 +749,10 @@ class FFMtorchNN(nn.Module):
         self.field_dims = field_dims
         self.feat2field = [i
                            for i, dim in enumerate(field_dims)
-                           for __ in range(dim)]
+                           for _ in range(dim)]
+        self.field2feat = defaultdict(list)
+        for feat, field in enumerate(self.feat2field):
+            self.field2feat[field].append(feat)
         self.n_fields = len(field_dims)
         self.n_features = sum(field_dims)
         self.n_factors = n_factors
@@ -784,25 +789,21 @@ class FFMtorchNN(nn.Module):
         # The interaction part
         # This is clearly not computationally efficient!
         total_inter = torch.zeros(x.shape[0])
-        # temp = torch.einsum('ij, jkl -> ikl', x, self.V)
+
+        temp_prod = torch.einsum('ij, jkl -> ijkl', x, self.V)
+        print(x.shape, self.V.shape, temp_prod.shape)
 
         for i in range(self.n_features):
             for j in range(i + 1, self.n_features):
-                temp1 = torch.mm(
-                    x[:, i].unsqueeze(1),
-                    self.V[i, self.feat2field[j], :].unsqueeze(0))
-                temp2 = torch.mm(
-                    x[:, j].unsqueeze(1),
-                    self.V[j, self.feat2field[i], :].unsqueeze(0))
+                temp1 = temp_prod[:, i, self.feat2field[j], :]
+                temp2 = temp_prod[:, j, self.feat2field[i], :]
                 total_inter += 0.5 * torch.sum(temp1 * temp2, dim=1)
-                # ix.append(temp[:, i, :] * temp[:, j, :])
-                # total_inter += torch.sum(
-                #     temp[:, i, :] *
-                #     temp[:, j, :],
-                #     dim=1)
 
         # Compute predictions
         y_pred = self.b + total_linear + total_inter
+        if self.binary:
+            y_pred = self.out_act(y_pred)
+        print('iteration is done')
 
         return y_pred
 
