@@ -222,19 +222,30 @@ class SVD(AlgoBase):
         qi = rng.normal(self.init_mean, self.init_std_dev,
                         (trainset.n_items, self.n_factors))
 
+        sample_weight = True if self.trainset.sample_weight else False
+
         if not self.biased:
             global_mean = 0
+
+        if sample_weight:
+            omega = 0
+            for (_, _, _, w) in self.trainset.all_ratings(sample_weight=True):
+                omega += w
+            omega /= self.trainset.n_ratings
 
         for current_epoch in range(self.n_epochs):
             if self.verbose:
                 print("Processing epoch {}".format(current_epoch))
-            for u, i, r in trainset.all_ratings():
+            for u, i, r, w in trainset.all_ratings(sample_weight=True):
 
                 # compute current error
                 dot = 0  # <q_i, p_u>
                 for f in range(self.n_factors):
                     dot += qi[i, f] * pu[u, f]
                 err = r - (global_mean + bu[u] + bi[i] + dot)
+
+                if sample_weight:
+                    err = w / omega * err
 
                 # update biases
                 if self.biased:
@@ -259,6 +270,9 @@ class SVD(AlgoBase):
         known_user = self.trainset.knows_user(u)
         known_item = self.trainset.knows_item(i)
 
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         if self.biased:
             est = self.trainset.global_mean
 
@@ -275,7 +289,7 @@ class SVD(AlgoBase):
             if known_user and known_item:
                 est = np.dot(self.qi[i], self.pu[u])
             else:
-                raise PredictionImpossible('User and item are unknown.')
+                raise PredictionImpossible('User or item are unknown.')
 
         return est
 
@@ -441,13 +455,21 @@ class SVDpp(AlgoBase):
                         (trainset.n_items, self.n_factors))
         u_impl_fdb = np.zeros(self.n_factors, np.double)
 
+        sample_weight = True if self.trainset.sample_weight else False
+
+        if sample_weight:
+            omega = 0
+            for (_, _, _, w) in self.trainset.all_ratings(sample_weight=True):
+                omega += w
+            omega /= self.trainset.n_ratings
+
         for current_epoch in range(self.n_epochs):
             if self.verbose:
                 print(" processing epoch {}".format(current_epoch))
-            for u, i, r in trainset.all_ratings():
+            for u, i, r, w in trainset.all_ratings(sample_weight=True):
 
                 # items rated by u. This is COSTLY
-                Iu = [j for (j, _) in trainset.ur[u]]
+                Iu = [j for (j, __, __) in trainset.ur[u]]
                 sqrt_Iu = np.sqrt(len(Iu))
 
                 # compute user implicit feedback
@@ -462,6 +484,9 @@ class SVDpp(AlgoBase):
                     dot += qi[i, f] * (pu[u, f] + u_impl_fdb[f])
 
                 err = r - (global_mean + bu[u] + bi[i] + dot)
+
+                if sample_weight:
+                    err = w / omega * err
 
                 # update biases
                 bu[u] += lr_bu * (err - reg_bu * bu[u])
@@ -486,18 +511,24 @@ class SVDpp(AlgoBase):
 
     def estimate(self, u, i, *_):
 
+        known_user = self.trainset.knows_user(u)
+        known_item = self.trainset.knows_item(i)
+
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         est = self.trainset.global_mean
 
-        if self.trainset.knows_user(u):
+        if known_user:
             est += self.bu[u]
 
-        if self.trainset.knows_item(i):
+        if known_item:
             est += self.bi[i]
 
-        if self.trainset.knows_user(u) and self.trainset.knows_item(i):
+        if known_user and known_item:
             Iu = len(self.trainset.ur[u])  # nb of items rated by u
-            u_impl_feedback = (sum(self.yj[j] for (j, _)
-                               in self.trainset.ur[u]) / np.sqrt(Iu))
+            u_impl_feedback = (sum(self.yj[j] for (j, _, _) in
+                                   self.trainset.ur[u]) / np.sqrt(Iu))
             est += np.dot(self.qi[i], self.pu[u] + u_impl_feedback)
 
         return est
@@ -660,8 +691,16 @@ class NMF(AlgoBase):
         bu = np.zeros(trainset.n_users, np.double)
         bi = np.zeros(trainset.n_items, np.double)
 
+        sample_weight = True if self.trainset.sample_weight else False
+
         if not self.biased:
             global_mean = 0
+
+        if sample_weight:
+            omega = 0
+            for (_, _, _, w) in self.trainset.all_ratings(sample_weight=True):
+                omega += w
+            omega /= self.trainset.n_ratings
 
         for current_epoch in range(self.n_epochs):
 
@@ -675,7 +714,7 @@ class NMF(AlgoBase):
             item_denom = np.zeros((trainset.n_items, self.n_factors))
 
             # Compute numerators and denominators for users and items factors
-            for u, i, r in trainset.all_ratings():
+            for u, i, r, w in trainset.all_ratings(sample_weight=True):
 
                 # compute current estimation and error
                 dot = 0  # <q_i, p_u>
@@ -684,6 +723,9 @@ class NMF(AlgoBase):
                 est = global_mean + bu[u] + bi[i] + dot
                 err = r - est
 
+                if sample_weight:
+                    err = w / omega * err
+
                 # update biases
                 if self.biased:
                     bu[u] += lr_bu * (err - reg_bu * bu[u])
@@ -691,10 +733,16 @@ class NMF(AlgoBase):
 
                 # compute numerators and denominators
                 for f in range(self.n_factors):
-                    user_num[u, f] += qi[i, f] * r
-                    user_denom[u, f] += qi[i, f] * est
-                    item_num[i, f] += pu[u, f] * r
-                    item_denom[i, f] += pu[u, f] * est
+                    if sample_weight:
+                        user_num[u, f] += qi[i, f] * r * w / omega
+                        user_denom[u, f] += qi[i, f] * est * w / omega
+                        item_num[i, f] += pu[u, f] * r * w / omega
+                        item_denom[i, f] += pu[u, f] * est * w / omega
+                    else:
+                        user_num[u, f] += qi[i, f] * r
+                        user_denom[u, f] += qi[i, f] * est
+                        item_num[i, f] += pu[u, f] * r
+                        item_denom[i, f] += pu[u, f] * est
 
             # Update user factors
             for u in trainset.all_users():
@@ -721,6 +769,9 @@ class NMF(AlgoBase):
         known_user = self.trainset.knows_user(u)
         known_item = self.trainset.knows_item(i)
 
+        if not (known_user or known_item):
+            raise PredictionImpossible('User and item are unknown.')
+
         if self.biased:
             est = self.trainset.global_mean
 
@@ -737,6 +788,6 @@ class NMF(AlgoBase):
             if known_user and known_item:
                 est = np.dot(self.qi[i], self.pu[u])
             else:
-                raise PredictionImpossible('User and item are unknown.')
+                raise PredictionImpossible('User or item are unknown.')
 
         return est

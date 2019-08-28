@@ -27,18 +27,21 @@ class Trainset:
 
 
     Attributes:
-        ur(:obj:`defaultdict` of :obj:`list`): The users ratings. This is a
-            dictionary containing lists of tuples of the form ``(item_inner_id,
-            rating)``. The keys are user inner ids.
-        ir(:obj:`defaultdict` of :obj:`list`): The items ratings. This is a
-            dictionary containing lists of tuples of the form ``(user_inner_id,
-            rating)``. The keys are item inner ids.
+        ur(:obj:`defaultdict` of :obj:`list`): The (offsetted) users ratings.
+            This is a dictionary containing lists of tuples of the form
+            ``(item_inner_id, rating)``. The keys are user inner ids.
+        ir(:obj:`defaultdict` of :obj:`list`): The (offsetted) items ratings.
+            This is a dictionary containing lists of tuples of the form
+            ``(user_inner_id, rating)``. The keys are item inner ids.
         u_features(:obj:`defaultdict` of :obj:`list`): The user features. This
             is a dictionary containing lists of features. The keys are user
             inner ids.
         i_features(:obj:`defaultdict` of :obj:`list`): The item features. This
             is a dictionary containing lists of features. The keys are item
             inner ids.
+        sample_weight(dict): The sample weights. This is a dictionary
+            containing the sample weight of a user-item pair. The keys are
+            the user-item inner ids provided as a tuple.
         n_users: Total number of users :math:`|U|`.
         n_items: Total number of items :math:`|I|`.
         n_user_features: Total number of user features.
@@ -47,17 +50,19 @@ class Trainset:
         rating_scale(tuple): The minimum and maximal rating of the rating
             scale.
         global_mean: The mean of all ratings :math:`\\mu`.
+        weighted_global_mean: The weighted mean of all ratings.
     """
 
-    def __init__(self, ur, ir, u_features, i_features, n_users, n_items,
-                 n_user_features, n_item_features, user_features_labels,
-                 item_features_labels, n_ratings, rating_scale, offset,
-                 raw2inner_id_users, raw2inner_id_items):
+    def __init__(self, ur, ir, u_features, i_features, sample_weight, n_users,
+                 n_items, n_user_features, n_item_features,
+                 user_features_labels, item_features_labels, n_ratings,
+                 rating_scale, offset, raw2inner_id_users, raw2inner_id_items):
 
         self.ur = ur
         self.ir = ir
         self.u_features = u_features
         self.i_features = i_features
+        self.sample_weight = sample_weight
         self.n_users = n_users
         self.n_items = n_items
         self.n_user_features = n_user_features
@@ -70,6 +75,7 @@ class Trainset:
         self._raw2inner_id_users = raw2inner_id_users
         self._raw2inner_id_items = raw2inner_id_items
         self._global_mean = None
+        self._weighted_global_mean = None
         # inner2raw dicts could be built right now (or even before) but they
         # are not always useful so we wait until we need them.
         self._inner2raw_id_users = None
@@ -217,7 +223,7 @@ class Trainset:
         except KeyError:
             raise ValueError(str(iiid) + ' is not a valid inner id.')
 
-    def all_ratings(self):
+    def all_ratings(self, sample_weight=False):
         """Generator function to iterate over all ratings.
 
         Yields:
@@ -226,8 +232,11 @@ class Trainset:
         """
 
         for u, u_ratings in iteritems(self.ur):
-            for i, r in u_ratings:
-                yield u, i, r
+            for i, r, w in u_ratings:
+                if sample_weight:
+                    yield u, i, r, w
+                else:
+                    yield u, i, r
 
     def build_testset(self):
         """Return a list of ratings that can be used as a testset in the
@@ -242,8 +251,8 @@ class Trainset:
 
         testset = []
         for (u, i, r) in self.all_ratings():
-            u_features = self.u_features.get(u, None)
-            i_features = self.i_features.get(i, None)
+            u_features = self.u_features.get(u, [])
+            i_features = self.i_features.get(i, [])
             testset.append((self.to_raw_uid(u), self.to_raw_iid(i), u_features,
                             i_features, r))
 
@@ -269,15 +278,22 @@ class Trainset:
         Returns:
             A list of tuples ``(uid, iid, fill)`` where ids are raw ids.
         """
-        fill = self.global_mean if fill is None else float(fill)
+
+        if fill is None:
+            if self.sample_weight:
+                fill = self.weighted_global_mean
+            else:
+                fill = self.global_mean
+        else:
+            fill = float(fill)
 
         anti_testset = []
         for u in self.all_users():
-            user_items = set([j for (j, _) in self.ur[u]])
+            user_items = set([j for (j, _, _) in self.ur[u]])
             anti_testset += [(self.to_raw_uid(u),
                               self.to_raw_iid(i),
-                              self.u_features.get(u, None),
-                              self.i_features.get(i, None),
+                              self.u_features.get(u, []),
+                              self.i_features.get(i, []),
                               fill)
                              for i in self.all_items()
                              if i not in user_items]
@@ -301,11 +317,30 @@ class Trainset:
 
     @property
     def global_mean(self):
-        """Return the mean of all ratings.
+        """Return the (offsetted) mean of all ratings.
 
-        It's only computed once."""
-        if self._global_mean is None:
-            self._global_mean = np.mean([r for (_, _, r) in
-                                         self.all_ratings()])
+        It's only computed once.
+        """
+
+        self._global_mean = np.mean([r for (_, _, r) in
+                                        self.all_ratings()])
 
         return self._global_mean
+
+    @property
+    def weighted_global_mean(self):
+        """Return the weighted (offsetted) mean of all ratings. It is
+        only computable if `sample_weight` is provided.
+
+        It's only computed once.
+        """
+
+        if not self.sample_weight:
+            raise ValueError('weighted_global_mean is only available when'
+                             'sample_weight is provided.')
+
+        r, w = zip(*[(r, w) for (_, _, r, w) in
+                     self.all_ratings(sample_weight=True)])
+        self._weighted_global_mean = np.average(r, weights=w)
+
+        return self._weighted_global_mean

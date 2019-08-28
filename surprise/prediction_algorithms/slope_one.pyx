@@ -4,6 +4,7 @@ the :mod:`slope_one` module includes the :class:`SlopeOne` algorithm.
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import warnings
 
 cimport numpy as np  # noqa
 import numpy as np
@@ -41,6 +42,9 @@ class SlopeOne(AlgoBase):
 
         AlgoBase.__init__(self)
 
+        warnings.warn('SlopeOne() currently does not use sample_weight',
+                      UserWarning)
+
     def fit(self, trainset):
 
         n_items = trainset.n_items
@@ -59,8 +63,8 @@ class SlopeOne(AlgoBase):
 
         # Computation of freq and dev arrays.
         for u, u_ratings in iteritems(trainset.ur):
-            for i, r_ui in u_ratings:
-                for j, r_uj in u_ratings:
+            for i, r_ui, w_ui in u_ratings:
+                for j, r_uj, w_uj in u_ratings:
                     freq[i, j] += 1
                     dev[i, j] += r_ui - r_uj
 
@@ -74,7 +78,7 @@ class SlopeOne(AlgoBase):
         self.dev = dev
 
         # mean ratings of all users: mu_u
-        self.user_mean = [np.mean([r for (_, r) in trainset.ur[u]])
+        self.user_mean = [np.mean([r for (_, r, _) in trainset.ur[u]])
                           for u in trainset.all_users()]
 
         return self
@@ -87,7 +91,7 @@ class SlopeOne(AlgoBase):
         # Ri: relevant items for i. This is the set of items j rated by u that
         # also have common users with i (i.e. at least one user has rated both
         # i and j).
-        Ri = [j for (j, _) in self.trainset.ur[u] if self.freq[i, j] > 0]
+        Ri = [j for (j, _, _) in self.trainset.ur[u] if self.freq[i, j] > 0]
         est = self.user_mean[u]
         if Ri:
             est += sum(self.dev[i, j] for j in Ri) / len(Ri)

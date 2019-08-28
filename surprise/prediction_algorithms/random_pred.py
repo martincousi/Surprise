@@ -33,13 +33,18 @@ class NormalPredictor(AlgoBase):
 
         AlgoBase.fit(self, trainset)
 
-        num = sum((r - self.trainset.global_mean)**2
+        if self.trainset.sample_weight:
+            self.normal_mean = self.trainset.weighted_global_mean
+        else:
+            self.normal_mean = self.trainset.global_mean
+
+        num = sum((r - self.normal_mean)**2
                   for (_, _, r) in self.trainset.all_ratings())
         denum = self.trainset.n_ratings
-        self.sigma = np.sqrt(num / denum)
+        self.normal_sigma = np.sqrt(num / denum)
 
         return self
 
     def estimate(self, *_):
 
-        return np.random.normal(self.trainset.global_mean, self.sigma)
+        return np.random.normal(self.normal_mean, self.normal_sigma)

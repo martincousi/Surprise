@@ -1,5 +1,5 @@
 """
-This module descibes how to build your own prediction algorithm. Please refer
+This module describes how to build your own prediction algorithm. Please refer
 to User Guide for more insight.
 """
 

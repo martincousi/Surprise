@@ -23,6 +23,7 @@ The available prediction algorithms are:
 from .algo_base import AlgoBase
 from .random_pred import NormalPredictor
 from .baseline_only import BaselineOnly
+from .global_only import GlobalOnly
 from .knns import KNNBasic
 from .knns import KNNBaseline
 from .knns import KNNWithMeans
@@ -33,11 +34,13 @@ from .matrix_factorization import NMF
 from .slope_one import SlopeOne
 from .co_clustering import CoClustering
 from .linear import Lasso
+from .factorization_machines import FM
+from .factorization_machines import FFM
 
 from .predictions import PredictionImpossible
 from .predictions import Prediction
 
-__all__ = ['AlgoBase', 'NormalPredictor', 'BaselineOnly', 'KNNBasic',
-           'KNNBaseline', 'KNNWithMeans', 'SVD', 'SVDpp', 'NMF', 'SlopeOne',
-           'CoClustering', 'PredictionImpossible', 'Prediction',
-           'KNNWithZScore', 'Lasso']
+__all__ = ['AlgoBase', 'NormalPredictor', 'BaselineOnly', 'GlobalOnly',
+           'KNNBasic', 'KNNBaseline', 'KNNWithMeans', 'SVD', 'SVDpp', 'NMF',
+           'SlopeOne', 'CoClustering', 'PredictionImpossible', 'Prediction',
+           'KNNWithZScore', 'Lasso', 'FM', 'FFM']

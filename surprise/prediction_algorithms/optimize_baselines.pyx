@@ -31,25 +31,50 @@ def baseline_als(self):
 
     cdef int u, i
     cdef double r, err, dev_i, dev_u
+    # global_mean can be computed as weighted mean or mean since the bias
+    # will only be pushed to bu and bi
     cdef double global_mean = self.trainset.global_mean
 
     cdef int n_epochs = self.bsl_options.get('n_epochs', 10)
     cdef double reg_u = self.bsl_options.get('reg_u', 15)
     cdef double reg_i = self.bsl_options.get('reg_i', 10)
 
+    sample_weight = True if self.trainset.sample_weight else False
+
+    if sample_weight:
+        omega = 0
+        for (_, _, _, w) in self.trainset.all_ratings(sample_weight=True):
+            omega += w
+        omega /= self.trainset.n_ratings
+
     for dummy in range(n_epochs):
         for i in self.trainset.all_items():
             dev_i = 0
-            for (u, r) in self.trainset.ir[i]:
-                dev_i += r - global_mean - bu[u]
-
-            bi[i] = dev_i / (reg_i + len(self.trainset.ir[i]))
+            sum_w_i = 0
+            for (u, r, w) in self.trainset.ir[i]:
+                if sample_weight:
+                    dev_i += w * (r - global_mean - bu[u])
+                    sum_w_i += w
+                else:
+                    dev_i += r - global_mean - bu[u]
+            if sample_weight:
+                bi[i] = dev_i / (omega * reg_i + sum_w_i)
+            else:
+                bi[i] = dev_i / (reg_i + len(self.trainset.ir[i]))
 
         for u in self.trainset.all_users():
             dev_u = 0
-            for (i, r) in self.trainset.ur[u]:
-                dev_u += r - global_mean - bi[i]
-            bu[u] = dev_u / (reg_u + len(self.trainset.ur[u]))
+            sum_w_u = 0
+            for (i, r, w) in self.trainset.ur[u]:
+                if sample_weight:
+                    dev_u += w * (r - global_mean - bi[i])
+                    sum_w_u += w
+                else:
+                    dev_u += r - global_mean - bi[i]
+            if sample_weight:
+                bu[u] = dev_u / (omega * reg_u + sum_w_u)
+            else:
+                bu[u] = dev_u / (reg_u + len(self.trainset.ur[u]))
 
     return bu, bi
 
@@ -69,15 +94,27 @@ def baseline_sgd(self):
 
     cdef int u, i
     cdef double r, err
+    # global_mean can be computed as weighted mean or mean since the bias
+    # will only be pushed to bu and bi
     cdef double global_mean = self.trainset.global_mean
 
     cdef int n_epochs = self.bsl_options.get('n_epochs', 20)
     cdef double reg = self.bsl_options.get('reg', 0.02)
     cdef double lr = self.bsl_options.get('learning_rate', 0.005)
 
+    sample_weight = True if self.trainset.sample_weight else False
+
+    if sample_weight:
+        omega = 0
+        for (_, _, _, w) in self.trainset.all_ratings(sample_weight=True):
+            omega += w
+        omega /= self.trainset.n_ratings
+
     for dummy in range(n_epochs):
-        for u, i, r in self.trainset.all_ratings():
+        for u, i, r, w in self.trainset.all_ratings(sample_weight=True):
             err = (r - (global_mean + bu[u] + bi[i]))
+            if sample_weight:
+                err = w / omega * err
             bu[u] += lr * (err - reg * bu[u])
             bi[i] += lr * (err - reg * bi[i])
 

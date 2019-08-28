@@ -9,6 +9,7 @@ cimport numpy as np  # noqa
 import numpy as np
 
 from .algo_base import AlgoBase
+from .predictions import PredictionImpossible
 from ..utils import get_rng
 
 
@@ -89,6 +90,8 @@ class CoClustering(AlgoBase):
         cdef int u, i, r, uc, ic
         cdef double est
 
+        sample_weight = True if self.trainset.sample_weight else False
+
         # Randomly assign users and items to intial clusters
         rng = get_rng(self.random_state)
         cltr_u = rng.randint(self.n_cltr_u, size=trainset.n_users)
@@ -98,9 +101,9 @@ class CoClustering(AlgoBase):
         user_mean = np.zeros(self.trainset.n_users, np.double)
         item_mean = np.zeros(self.trainset.n_items, np.double)
         for u in trainset.all_users():
-            user_mean[u] = np.mean([r for (_, r) in trainset.ur[u]])
+            user_mean[u] = np.mean([r for (_, r, w) in trainset.ur[u]])
         for i in trainset.all_items():
-            item_mean[i] = np.mean([r for (_, r) in trainset.ir[i]])
+            item_mean[i] = np.mean([r for (_, r, w) in trainset.ir[i]])
 
         # Optimization loop. This could be optimized a bit by checking if
         # clusters where effectively updated and early stop if they did not.
@@ -117,12 +120,15 @@ class CoClustering(AlgoBase):
             for u in self.trainset.all_users():
                 errors = np.zeros(self.n_cltr_u, np.double)
                 for uc in range(self.n_cltr_u):
-                    for i, r in self.trainset.ur[u]:
+                    for i, r, w in self.trainset.ur[u]:
                         ic = cltr_i[i]
                         est = (avg_cocltr[uc, ic] +
                                user_mean[u] - avg_cltr_u[uc] +
                                item_mean[i] - avg_cltr_i[ic])
-                        errors[uc] += (r - est)**2
+                        if sample_weight:
+                            errors[uc] += w * (r - est)**2
+                        else:
+                            errors[uc] += (r - est)**2
                 cltr_u[u] = np.argmin(errors)
 
             # set item cluster to the one that minimizes squarred error over
@@ -130,12 +136,15 @@ class CoClustering(AlgoBase):
             for i in self.trainset.all_items():
                 errors = np.zeros(self.n_cltr_i, np.double)
                 for ic in range(self.n_cltr_i):
-                    for u, r in self.trainset.ir[i]:
+                    for u, r, w in self.trainset.ir[i]:
                         uc = cltr_u[u]
                         est = (avg_cocltr[uc, ic] +
                                user_mean[u] - avg_cltr_u[uc] +
                                item_mean[i] - avg_cltr_i[ic])
-                        errors[ic] += (r - est)**2
+                        if sample_weight:
+                            errors[ic] += w * (r - est)**2
+                        else:
+                            errors[ic] += (r - est)**2
                 cltr_i[i] = np.argmin(errors)
 
         # Compute averages one last time as clusters may have change
@@ -239,7 +248,7 @@ class CoClustering(AlgoBase):
     def estimate(self, u, i, *_):
 
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
-            return self.trainset.global_mean
+            raise PredictionImpossible('Unknown user and item')
 
         if not self.trainset.knows_user(u):
             return self.cltr_i[i]

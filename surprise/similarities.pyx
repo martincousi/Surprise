@@ -76,8 +76,8 @@ def cosine(n_x, yr, min_support):
     sim = np.zeros((n_x, n_x), np.double)
 
     for y, y_ratings in iteritems(yr):
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
+        for xi, ri, wi in y_ratings:
+            for xj, rj, wj in y_ratings:
                 freq[xi, xj] += 1
                 prods[xi, xj] += ri * rj
                 sqi[xi, xj] += ri**2
@@ -147,8 +147,8 @@ def msd(n_x, yr, min_support):
     sim = np.zeros((n_x, n_x), np.double)
 
     for y, y_ratings in iteritems(yr):
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
+        for xi, ri, wi in y_ratings:
+            for xj, rj, wj in y_ratings:
                 sq_diff[xi, xj] += (ri - rj)**2
                 freq[xi, xj] += 1
 
@@ -228,8 +228,8 @@ def pearson(n_x, yr, min_support):
     sim = np.zeros((n_x, n_x), np.double)
 
     for y, y_ratings in iteritems(yr):
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
+        for xi, ri, wi in y_ratings:
+            for xj, rj, wj in y_ratings:
                 prods[xi, xj] += ri * rj
                 freq[xi, xj] += 1
                 sqi[xi, xj] += ri**2
@@ -335,8 +335,8 @@ def pearson_baseline(n_x, yr, min_support, global_mean, x_biases, y_biases,
 
     for y, y_ratings in iteritems(yr):
         partial_bias = global_mean_ + y_biases_[y]
-        for xi, ri in y_ratings:
-            for xj, rj in y_ratings:
+        for xi, ri, wi in y_ratings:
+            for xj, rj, wj in y_ratings:
                 freq[xi, xj] += 1
                 diff_i = (ri - (partial_bias + x_biases_[xi]))
                 diff_j = (rj - (partial_bias + x_biases_[xj]))

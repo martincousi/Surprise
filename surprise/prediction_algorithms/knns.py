@@ -4,6 +4,8 @@ the :mod:`knns` module includes some k-NN inspired algorithms.
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
+import warnings
+
 import numpy as np
 from six import iteritems
 import heapq
@@ -27,7 +29,10 @@ class SymmetricAlgo(AlgoBase):
     reversed.
     """
 
-    def __init__(self, sim_options={}, verbose=True, **kwargs):
+    def __init__(self, sim_options=None, verbose=False, **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         AlgoBase.__init__(self, sim_options=sim_options, **kwargs)
         self.verbose = verbose
@@ -83,10 +88,14 @@ class KNNBasic(SymmetricAlgo):
             measure. See :ref:`similarity_measures_configuration` for accepted
             options.
         verbose(bool): Whether to print trace messages of bias estimation,
-            similarity, etc.  Default is True.
+            similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=True, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options, verbose=verbose,
                                **kwargs)
@@ -94,6 +103,10 @@ class KNNBasic(SymmetricAlgo):
         self.min_k = min_k
 
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn('KNNBasic() currently does not use sample_weight',
+                          UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.sim = self.compute_similarities()
@@ -107,7 +120,7 @@ class KNNBasic(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[0])
 
         # compute weighted average
@@ -161,10 +174,14 @@ class KNNWithMeans(SymmetricAlgo):
             measure. See :ref:`similarity_measures_configuration` for accepted
             options.
         verbose(bool): Whether to print trace messages of bias estimation,
-            similarity, etc.  Default is True.
+            similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=True, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options,
                                verbose=verbose, **kwargs)
@@ -172,14 +189,21 @@ class KNNWithMeans(SymmetricAlgo):
         self.k = k
         self.min_k = min_k
 
+
+
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn(
+                'KNNWithMeans() currently does not use sample_weight',
+                UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.sim = self.compute_similarities()
 
         self.means = np.zeros(self.n_x)
         for x, ratings in iteritems(self.xr):
-            self.means[x] = np.mean([r for (_, r) in ratings])
+            self.means[x] = np.mean([r for (_, r, _) in ratings])
 
         return self
 
@@ -190,7 +214,7 @@ class KNNWithMeans(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         est = self.means[x]
@@ -258,11 +282,16 @@ class KNNBaseline(SymmetricAlgo):
             computation. See :ref:`baseline_estimates_configuration` for
             accepted options.
         verbose(bool): Whether to print trace messages of bias estimation,
-            similarity, etc.  Default is True.
+            similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, bsl_options={},
-                 verbose=True, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, bsl_options=None,
+                 verbose=False, **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
+        if bsl_options is None:
+            bsl_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options,
                                bsl_options=bsl_options, verbose=verbose,
@@ -272,6 +301,10 @@ class KNNBaseline(SymmetricAlgo):
         self.min_k = min_k
 
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn('KNNBaseline() currently does not use sample_weight',
+                          UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
         self.bu, self.bi = self.compute_baselines()
@@ -293,7 +326,7 @@ class KNNBaseline(SymmetricAlgo):
         if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
             return est
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         # compute weighted average
@@ -352,10 +385,14 @@ class KNNWithZScore(SymmetricAlgo):
             measure. See :ref:`similarity_measures_configuration` for accepted
             options.
         verbose(bool): Whether to print trace messages of bias estimation,
-            similarity, etc.  Default is True.
+            similarity, etc.  Default is False.
     """
 
-    def __init__(self, k=40, min_k=1, sim_options={}, verbose=True, **kwargs):
+    def __init__(self, k=40, min_k=1, sim_options=None, verbose=False,
+                 **kwargs):
+
+        if sim_options is None:
+            sim_options = {}
 
         SymmetricAlgo.__init__(self, sim_options=sim_options, verbose=verbose,
                                **kwargs)
@@ -364,6 +401,11 @@ class KNNWithZScore(SymmetricAlgo):
         self.min_k = min_k
 
     def fit(self, trainset):
+
+        if trainset.sample_weight:
+            warnings.warn(
+                'KNNWithZScore() currently does not use sample_weight',
+                UserWarning)
 
         SymmetricAlgo.fit(self, trainset)
 
@@ -374,8 +416,8 @@ class KNNWithZScore(SymmetricAlgo):
                                      in self.trainset.all_ratings()])
 
         for x, ratings in iteritems(self.xr):
-            self.means[x] = np.mean([r for (_, r) in ratings])
-            sigma = np.std([r for (_, r) in ratings])
+            self.means[x] = np.mean([r for (_, r, _) in ratings])
+            sigma = np.std([r for (_, r, _) in ratings])
             self.sigmas[x] = self.overall_sigma if sigma == 0.0 else sigma
 
         self.sim = self.compute_similarities()
@@ -389,7 +431,7 @@ class KNNWithZScore(SymmetricAlgo):
 
         x, y = self.switch(u, i)
 
-        neighbors = [(x2, self.sim[x, x2], r) for (x2, r) in self.yr[y]]
+        neighbors = [(x2, self.sim[x, x2], r) for (x2, r, _) in self.yr[y]]
         k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[1])
 
         est = self.means[x]

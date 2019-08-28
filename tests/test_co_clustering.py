@@ -9,6 +9,7 @@ import os
 from surprise import CoClustering
 from surprise import Dataset
 from surprise import Reader
+from surprise.accuracy import neg_rmse
 from surprise.model_selection import cross_validate
 from surprise.model_selection import PredefinedKFold
 
@@ -25,19 +26,23 @@ def test_CoClustering_parameters():
 
     # The baseline against which to compare.
     algo = CoClustering(n_epochs=1, random_state=1)
-    rmse_default = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_default = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
 
     # n_cltr_u
     algo = CoClustering(n_cltr_u=1, n_epochs=1, random_state=1)
-    rmse_n_cltr_u = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_n_cltr_u = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
     assert rmse_default != rmse_n_cltr_u
 
     # n_cltr_i
     algo = CoClustering(n_cltr_i=1, n_epochs=1, random_state=1)
-    rmse_n_cltr_i = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_n_cltr_i = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
     assert rmse_default != rmse_n_cltr_i
 
     # n_epochs
     algo = CoClustering(n_epochs=2, random_state=1)
-    rmse_n_epochs = cross_validate(algo, data, ['rmse'], pkf)['test_rmse']
+    rmse_n_epochs = cross_validate(algo, data, [['neg_rmse', neg_rmse]], pkf)[
+        'test_neg_rmse']
     assert rmse_default != rmse_n_epochs
